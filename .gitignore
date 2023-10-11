@@ -1,0 +1,20 @@
+# History files
+.Rhistory
+.Rapp.history
+.DS_Store
+
+# Session Data files
+.RData
+ab_data.csv
+mimic3d.csv
+
+# RStudio files
+.Rproj.user/
+
+# Project file
+Data_Analysis_Proj_2.Rproj
+*.html
+*.log
+*.pdf
+*.tex
+Figures/*_files/
