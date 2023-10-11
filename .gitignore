@@ -8,6 +8,7 @@
 ab_data.csv
 mimic3d.csv
 
+
 # RStudio files
 .Rproj.user/
 
@@ -18,3 +19,4 @@ Data_Analysis_Proj_2.Rproj
 *.pdf
 *.tex
 Figures/*_files/
+!Citation/*
