@@ -44,7 +44,7 @@ $$
 P(p_1 > p_2 |\vec{x}) = \int_0^1 \int_0^1 \mathbb{I}(p_1 > p_2 |\vec{x}) \cdot f(p_1|\vec{x})f(p_2|\vec{x})dp_1 dp_2 = E[\mathbb{I}(p_1 > p_2 |\vec{x})]
 $$
 
-where $\mathbb{I}(p_1 \leq p_2|\vec{x})$ is the indicator function given the data and $f(p_1|\vec{x})$, $f(p_2|\vec{x})$ are the posterior Beta probability density functions for Model1 and Model2 respectively. To estimate this probability, one only needs to simulate pairs of Beta random variables from the two posterior distributions simultaneously, and calculate the average of the indicator function. 
+where $\mathbb{I}(p_1 \leq p_2|\vec{x})$ is the indicator function given the data and $f(p_1|\vec{x})$, $f(p_2|\vec{x})$ are the posterior Beta probability density functions for control and treatment respectively. To estimate this probability, one only needs to simulate pairs of Beta random variables from the two posterior distributions simultaneously, and calculate the average of the indicator function. 
 
 The interpretation of a confidence interval is important. In a frequentist point of view, our unknown parameter $p$ is a true but fixed value. The confidence interval on the other hand is a random set, thus it is incorrect to state that we are 99% sure that the confidence interval covers the unknown true parameter. It is also incorrect to say that the unknown parameter falls within the confidence interval 99% of the time, because in this statement the unknown parameter is falsely treated as a random variable. Therefore the appropriate interpretation of the confidence interval is: when the experiment is repeated many times to generate random samples and their perspective confidence intervals, 99% of these confidence intervals will cover the unknown fixed parameter.
 
