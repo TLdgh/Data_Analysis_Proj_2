@@ -29,21 +29,16 @@ library(webshot)
 ```
 
 # Introduction
-The first intuitive question one can address is on the conversion rate of the visitors switching from the oldpage to the new page. in generating the correct answer to the prompt. We treat each visitor's decision as independent. The result forms a random sample of Bernoulli trials. Suppose $X_1,...,X_n$ are the random sample of the visitor's choice, with $X_i=1$ if a visitor chooses to switch to the new page with probability $p$, otherwise $X_i=0$ with probability $1-p$. The success rate $p$ is the parameter of the Bernoulli distribution. Our goal is therefore to estimate this success probability.
+An webpage designer might be interested in the goodness of the new design compared with the old one. In this project we were given a data set from a designed experiment. In this experiment, participants were randomly given a new webpage as the treatment or an old webpage as a control. Each participant decides if he/she wants to "convert", or in other words to make a decision. In addition, we treat each visitor's decision as independent. The result forms a random sample of Bernoulli trials. Suppose $X_1,...,X_n$ are the random sample of the visitor's choice, with $X_i=1$ if a visitor chooses to convert to the webpage assigned to him with probability $p$, otherwise $X_i=0$ with probability $1-p$. The success rate $p$ is the parameter of the Bernoulli distribution. Our goal is therefore to compare the success probabilities $p_1$ and $p_2$, where $p_1$ is the rate for the control group and $p_2$ is the rate for the treatment group.
 
-
-We can have various hypothesis tests on the success probability $p$. One may consider a right-tailed hypothesis:
+We can have various hypothesis tests on the success probability $p$. One may consider a hypothesis test:
 
 $$
-H_0: ~ p \leq p_0 \\
-H_1: ~ p> p_0
+H_0: ~ p_1 \leq p_2 \\
+H_1: ~ p_1 > p_2
 $$
 
-such that we would like to know if the success probability is greater than certain value $p_0$. In the frequentist approach, we often need to specify the significance level $\alpha$, which is the type I error defined by:
-$$
-\alpha = E[\phi(\vec{X}) | H_0] = \mathbb{P}(T(\vec{X}) \in R) = \int_R f_T(t)dt
-$$
-This requires us to find the distribution of the statistic $T(\vec{X})$ under the null hypothesis and its corresponding rejection region $R$, which in general is difficult. However, with Bayesian analysis one can evaluate directly the probability of the null hypothesis. We can do this by using the Monte Carlo method to evaluate the following integral:
+such that we would like to know if the conversion rate for the old page is greater than the one for the new page. With Bayesian analysis one can evaluate directly the probability of the null and the alternative hypotheses. We can do this by using the Monte Carlo method to evaluate the following integral:
 
 $$
 P(p_1 > p_2 |\vec{x}) = \int_0^1 \int_0^1 \mathbb{I}(p_1 > p_2 |\vec{x}) \cdot f(p_1|\vec{x})f(p_2|\vec{x})dp_1 dp_2 = E[\mathbb{I}(p_1 > p_2 |\vec{x})]
@@ -51,7 +46,7 @@ $$
 
 where $\mathbb{I}(p_1 \leq p_2|\vec{x})$ is the indicator function given the data and $f(p_1|\vec{x})$, $f(p_2|\vec{x})$ are the posterior Beta probability density functions for Model1 and Model2 respectively. To estimate this probability, one only needs to simulate pairs of Beta random variables from the two posterior distributions simultaneously, and calculate the average of the indicator function. 
 
-The interpretation of a confidence interval is important. In a frequentist point of view, our unknown parameter $p$ is a true but fixed value. The confidence interval on the other hand is a random set, thus it is incorrect to state that we are 99% sure that the confidence interval covers the unknown true paramter. It is also incorrect to say that the unknown parameter falls within the confidence interval 99% of the time, because in this statement the unknown parameter is falsely treated as a random variable. Therefore the appropriate interpretation of the confidence interval is: when the experiment is repeated many times to generate random samples and their perspective confidence intervals, 99% of these confidence intervals will cover the unknown fixed parameter.
+The interpretation of a confidence interval is important. In a frequentist point of view, our unknown parameter $p$ is a true but fixed value. The confidence interval on the other hand is a random set, thus it is incorrect to state that we are 99% sure that the confidence interval covers the unknown true parameter. It is also incorrect to say that the unknown parameter falls within the confidence interval 99% of the time, because in this statement the unknown parameter is falsely treated as a random variable. Therefore the appropriate interpretation of the confidence interval is: when the experiment is repeated many times to generate random samples and their perspective confidence intervals, 99% of these confidence intervals will cover the unknown fixed parameter.
 
 If we use the Bayesian approach to gain a different understanding of our unknown parameter and to draw inference on it, we then get the ($1-\alpha$)-level credible interval for the conversion rate based on the quantile of the posterior distribution as $[L(\vec{x}), R(\vec{x})]$ such that:
 $$
@@ -76,22 +71,14 @@ $$
 \alpha = - \frac{t_1}{t_2}\cdot (t_1^2-t_1+t_2), \quad \beta=\alpha \cdot \frac{1-t_1}{t_1}.
 $$ 
 
-Since the random sample $X_1,...,X_n$ follows Bernoulli(p) distribution, we have a conjugate pair of the prior and posterior distributions:
-
-\begin{align*}
-f(p|\vec{x})&=\frac{f(p)f(\vec{x}|p)}{\int_0^1 f(p)f(\vec{x}|p) dp}=\frac{\frac{\Gamma(\alpha+\beta)}{\Gamma(\alpha)\Gamma(\beta)} p^{\alpha-1+\sum_{i=1}^n x_i} (1-p)^{\beta-1+n-\sum_{i=1}^n x_i}}{\int_0^1 \frac{\Gamma(\alpha+\beta)}{\Gamma(\alpha)\Gamma(\beta)} p^{\alpha-1+\sum_{i=1}^n x_i} (1-p)^{\beta-1+n-\sum_{i=1}^n x_i} dp}\\
-&=\frac{p^{\alpha-1+\sum_{i=1}^n x_i} (1-p)^{\beta-1+n-\sum_{i=1}^n x_i}}{\frac{\Gamma(\alpha+\sum_{i=1}^n x_i)\Gamma(\beta+n-\sum_{i=1}^n x_i)}{\Gamma(\alpha+\beta+n)}}\\
-&=\frac{\Gamma(\alpha+\beta+n)}{\Gamma(\alpha+\sum_{i=1}^n x_i)\Gamma(\beta+n-\sum_{i=1}^n x_i)} p^{\alpha-1+\sum_{i=1}^n x_i} (1-p)^{\beta-1+n-\sum_{i=1}^n x_i}
-\end{align*}
-
-i.e. the posterior distribution is $Beta(\alpha+\sum_{i=1}^n x_i, \beta+n-\sum_{i=1}^n x_i)$ with the mean and variance:
+Since the random sample $X_1,...,X_n$ follows Bernoulli(p) distribution, we have a conjugate pair of the prior and posterior distributions, i.e. the posterior distribution is $Beta(\alpha+\sum_{i=1}^n x_i, \beta+n-\sum_{i=1}^n x_i)$ with the mean and variance:
 
 \begin{gather*}
 E(p|\vec{x})=\frac{\alpha+\sum_{i=1}^n x_i}{\alpha+\beta+n}\\
 Var(p|\vec{x})=\frac{(\alpha+\sum_{i=1}^n x_i)(\beta+n-\sum_{i=1}^n x_i)}{(\alpha+\beta+n)^2(\alpha+\beta+n+1)}
 \end{gather*}
 
-One can see that asymptotically when we have a large sample size n, the mean of the posterior distribution approaches to the maximum likelihood estimator $\hat{p} =\frac{1}{n}\sum_{i=1}^n x_i$. Thus the specification of a prior is less important if the sample size is large.  This allows us to make a subjective assumption of the success rate based on a probability distribution instead of viewing it as a fixed but unknown number in the frequentist hypothesis test. In the case where $\alpha=\beta=1$, we obtain the non-informative prior $Beta(1,1)$, which is $Uniform([0,1])$ distribution. It's called non-informative because we assume that all p are equally probable. In other words, we no longer put a subjective assumption on $p$.
+One can see that asymptotically when we have a large sample size n, the mean of the posterior distribution approaches to the maximum likelihood estimator $\hat{p} =\frac{1}{n}\sum_{i=1}^n x_i$. Thus the specification of a prior is less important if the sample size is large. This allows us to make a subjective assumption of the success rate based on a probability distribution instead of viewing it as a fixed but unknown number in the frequentist hypothesis test. In the case where $\alpha=\beta=1$, we obtain the non-informative prior $Beta(1,1)$, which is $Uniform([0,1])$ distribution. It's called non-informative because we assume that all p are equally probable. In other words, we no longer put a subjective assumption on $p$.
 
 # Method
 ```{r}
