@@ -99,4 +99,15 @@ ab_data<-read.csv("ab_data.csv", header = TRUE)
 mimic3d<-read.csv("mimic3d.csv", header = TRUE)
 ```
 
+```{r}
+#cleanning the data
+ab_data<-slice(ab_data, -which(ab_data$group=="control" & ab_data$landing_page=="new_page"))
+ab_data<-slice(ab_data, -which(ab_data$group=="treatment" & ab_data$landing_page=="old_page"))
+ab_data<-slice(ab_data, -c(1877)) #drop the duplicated row for the ID 773192
+```
+
+```{r}
+cat("Each ID has an unique value: ", length(unique(ab_data$user_id))==nrow(ab_data))
+```
+
 # References
