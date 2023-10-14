@@ -170,20 +170,26 @@ ggplot(df2) +
 ```
 
 ```{r}
-visitor_to_old <- 145274
-visitor_to_new <- 145310
-conversion_old <- 17489
-conversion_new <- 17264
+visitor_to_old <- nrow(old_distinct)
+visitor_to_new <- nrow(new_distinct)
+conversion_old <- sum(old_distinct$converted)
+conversion_new <- sum(new_distinct$converted)
 
 alpha_prior <- 2
 beta_prior <- 20
 
 # calculate posterior
-posterior_old <- rbeta(100000, alpha_prior + conversion_old, beta_prior + visitor_to_old - conversion_old)
-posterior_new <- rbeta(100000, alpha_prior + conversion_new, beta_prior + visitor_to_new - conversion_new)
+posterior_old <- rbeta(1000000, alpha_prior+conversion_old, beta_prior+visitor_to_old-conversion_old)
+posterior_new <- rbeta(1000000, alpha_prior+conversion_new, beta_prior+visitor_to_new-conversion_new)
 
 # calculate new rate - old rate
 mean(posterior_new > posterior_old)
+
+#Riemann sum as safety check:
+sapply(seq(0.001,0.999, length.out=1000000), function(x){
+    dbeta(x, alpha_prior+conversion_new,beta_prior+visitor_to_new-conversion_new)*
+      pbeta(x, alpha_prior+conversion_old, beta_prior+visitor_to_old-conversion_old)})%>%sum()/1000000
+
 ```
 
 ```{r}
