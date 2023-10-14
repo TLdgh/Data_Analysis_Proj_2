@@ -81,6 +81,7 @@ fig_1 <- plot_ly(
   y = prop$proportion,
   type = "bar"
 ) %>% layout(yaxis = list(title = "Conversion Rate"))
+
 fig_1
 ```
 
@@ -178,9 +179,39 @@ alpha_prior <- 2
 beta_prior <- 20
 
 # calculate posterior
-posterior_old <- rbeta(100, alpha_prior + conversion_old, beta_prior + visitor_to_old - conversion_old)
-posterior_new <- rbeta(100, alpha_prior + conversion_new, beta_prior + visitor_to_new - conversion_new)
+posterior_old <- rbeta(100000, alpha_prior + conversion_old, beta_prior + visitor_to_old - conversion_old)
+posterior_new <- rbeta(100000, alpha_prior + conversion_new, beta_prior + visitor_to_new - conversion_new)
 
 # calculate new rate - old rate
 mean(posterior_new > posterior_old)
+```
+
+```{r}
+posterior_Old <- data.frame(old_rate=c(posterior_old))
+posterior_New <- data.frame(new_rate=c(posterior_new))
+mean_old <- mean(posterior_Old$old_rate)
+mean_new <- mean(posterior_New$new_rate)
+cat("Mean of conversion rate on old page is", mean_old, "\n")
+cat("Mean of conversion rate on new page is", mean_new, "\n")
+```
+
+```{r}
+# plot density 
+fig_2 <- ggplot() +
+  geom_density(aes(x = posterior_Old$old_rate), fill = "blue", alpha = 0.5) +
+  geom_density(aes(x = posterior_New$new_rate), fill = "red", alpha = 0.5) +
+  geom_vline(xintercept = mean_old, linetype = "dashed", color = "blue") +
+  geom_vline(xintercept = mean_new, linetype = "dashed", color = "red") +
+  labs(title = "Probability Density Comparison", subtitle = "New page vs. old page",
+       x = "Conversion rate",
+       y = "Density") +
+  annotate("text", x = 0.1187, y = 300, label= "New Page") +
+  annotate("text", x = 0.1205, y = 300, label= "Old Page") +
+  annotate("text", x = mean_old, y = 0, label = paste("mean of old\n", round(mean_old, 6)), vjust = 0.5, size = 3) +
+  annotate("text", x = mean_new, y = 0, label = paste("mean of new\n", round(mean_new, 6)), vjust = 0.5, size = 3) +
+  annotate("segment", x = mean_old, xend = mean_new, y = 500, yend = 500, colour = "black", linewidth = 2, arrow = arrow()) +
+  annotate("text", x = (mean_old + mean_new)/2, y = 480, label = paste(round(mean_old-mean_new,6))) +
+  scale_color_manual(values = c("red", "blue"), labels = c("new page", "old page"))
+
+fig_2
 ```
