@@ -54,6 +54,7 @@ params_sim_correct<- params_sim_correct%>%mutate(true_param = case_when(
   param == "beta1" ~ params_true$beta1,
   param == "sigmasq" ~ params_true$sigmasq
 ))
+df_vline<-distinct(params_sim_correct, labels, true_param)
 
 p1<-params_sim_correct%>%ggplot(aes(x=value)) +
   geom_histogram(aes(y=..density..), bins = 50, fill="skyblue", color="black") +
