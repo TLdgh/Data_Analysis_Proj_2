@@ -1,0 +1,186 @@
+---
+title: "Untitled"
+author: "Yang Lyu"
+date: "11/10/2023"
+output: pdf_document
+---
+
+```{r}
+library(dplyr)
+library(plotly)
+```
+
+```{r}
+data <- read.csv("ab_data.csv")
+head(data)
+```
+
+```{r}
+summary(data)
+print("Number of rows in data: ")
+# num of rows in data
+nrow(data)
+# num of missing
+print("Number of missing values: ")
+sum(is.na(data))
+```
+
+```{r}
+mimic3d <- read.csv("mimic3d.csv")
+#View(data)
+nrow(mimic3d)*0.8 # take 47180 rows as training, rest 20% as  patients.csv
+training <- mimic3d[1:47180,]
+head(training)
+tail(training)
+patients <- data[47181:nrow(mimic3d),]
+head(patients)
+```
+
+```{r}
+df <- read.csv("train_data.csv")
+head(df)
+tail(df)
+```
+
+```{r}
+old <- data %>% filter(landing_page == "old_page" & group == "control")
+new <- data %>% filter(landing_page == "new_page" & group == "treatment")
+count(old,old$converted == 1)
+count(new, new$converted == 1)
+```
+
+```{r}
+nrow(old)
+old[!duplicated(old$user_id),]
+```
+
+```{r}
+old_distinct <- old %>% distinct(old$user_id, .keep_all = TRUE)
+new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
+```
+
+```{r}
+prop_old <- sum(old_distinct$converted == 1)/nrow(old_distinct)
+nrow(old_distinct)
+sum(old_distinct$converted==1)
+prop_new <- sum(new_distinct$converted == 1)/nrow(new_distinct)
+nrow(new_distinct)
+sum(new_distinct$converted==1)
+prop_old
+prop_new
+```
+
+```{r}
+prop <- data.frame(
+  langing_page = c("Old Page", "New Page"),
+  proportion = c(prop_old, prop_new)
+)
+# plot data
+fig_1 <- plot_ly(
+  x = prop$langing_page, 
+  y = prop$proportion,
+  type = "bar"
+) %>% layout(yaxis = list(title = "Conversion Rate"))
+fig_1
+```
+
+```{r, warning=FALSE}
+library(rstan)
+
+data <- list(
+  N_old = 145274,
+  N_new = 145310,
+  conversions_old = 17489,
+  conversions_new = 17264
+)
+
+stan_code <- "
+data {
+  int<lower=0> N_old;
+  int<lower=0> N_new;
+  int<lower=0> conversions_old;
+  int<lower=0> conversions_new;
+}
+
+parameters {
+  real<lower=0, upper=1> p_old;
+  real<lower=0, upper=1> p_new;
+}
+
+model {
+  p_old ~ beta(2 + conversions_old, 20 + N_old - conversions_old);
+  p_new ~ beta(2 + conversions_new, 20 + N_new - conversions_new);
+}
+
+generated quantities {
+  real p_difference;
+  p_difference = p_new - p_old;
+}
+"
+
+stan_model <- stan_model(model_code = stan_code)
+
+# MCMC sampling
+stan_samples <- sampling(stan_model, data = data, iter = 10000, chains = 4)
+
+# posterior result
+posterior_samples <- extract(stan_samples)
+p_difference <- posterior_samples$p_difference
+
+# calculate prob of new_better
+prob_new_better <- mean(p_difference > 0)
+
+cat("\n Probability that the new page is better than the old page:", prob_new_better, "\n")
+
+```
+```{r}
+p_difference <- posterior_samples$p_difference
+df <- data.frame(p_difference)
+
+# plot difference density
+ggplot(df, aes(x = p_difference)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Probability Density",
+       x = "new page rate- old page rate",
+       y = "Density") +
+  theme_minimal()
+
+```
+
+```{r}
+# posterior for old page
+p_old <- posterior_samples$p_old
+df1 <- data.frame(p_old)
+# posterior for new page
+p_new <- posterior_samples$p_new
+df2 <- data.frame(p_new)
+
+# plot density 
+ggplot(df2) +
+  geom_density(aes(x = p_old), fill = "blue", alpha = 0.5) +
+  geom_density(aes(x = p_new), fill = "red", alpha = 0.5) +
+  labs(title = "Probability Density",
+       x = "Conversion rate",
+       y = "Density") +
+  annotate("text", x=0.1187, y = 300, label= "New Page") +
+  annotate("text", x=0.1205, y = 300, label= "Old Page")
+
+```
+
+```{r}
+visitor_to_old <- 145274
+visitor_to_new <- 145310
+conversion_old <- 17489
+conversion_new <- 17264
+
+alpha_prior <- 2
+beta_prior <- 20
+
+# calculate posterior
+posterior_old <- rbeta(100, alpha_prior + conversion_old, beta_prior + visitor_to_old - conversion_old)
+posterior_new <- rbeta(100, alpha_prior + conversion_new, beta_prior + visitor_to_new - conversion_new)
+
+# calculate new rate - old rate
+mean(posterior_new > posterior_old)
+```
