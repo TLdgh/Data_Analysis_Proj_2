@@ -100,12 +100,7 @@ cat("Each ID has an unique value: ", length(unique(ab_data$user_id))==nrow(ab_da
 ```{r}
 #Bayesian Regression Analysis
 PosteriorSample<-function(x, y, a, b, m, V, sim_n=100000){
-  #Get the priors
-  sigmasq<-1/rgamma(1, shape=a, rate=b) #the variance
-  betas<-MASS::mvrnorm(n=1, mu=m, Sigma = sigmasq*V) #the betas
-  
-  
-  # Calculate the parameters for the posterior
+# Calculate the parameters for the posterior
   mu<-solve(t(x)%*%x + solve(V))%*%(t(x)%*%y + solve(V)%*%m)
   CovM<-solve(t(x)%*%x + solve(V))
   a_star<-n/2+a
