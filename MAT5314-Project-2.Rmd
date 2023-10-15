@@ -129,14 +129,14 @@ PosteriorSample<-function(x, y, a, b, m, V, sim_n=100000){
 train_data<-mimic3d[1:47180,]
 test_data<-mimic3d[47181:nrow(mimic3d),]
 
-data<-train_data%>%select(LOSdays,NumTransfers, NumDiagnosis, NumNotes, NumCallouts, NumProcEvents)
+data<-train_data%>%select(LOSdays,NumTransfers, NumDiagnosis, NumNotes, NumCallouts, NumProcEvents, NumLabs)
 x<-data%>%select(-LOSdays)%>%mutate(Intercept=1, .before=NumTransfers)%>%as.matrix()
 y<-matrix(data$LOSdays, ncol=1)
 
-fit<-lm(LOSdays~NumTransfers+NumDiagnosis+NumNotes+NumCallouts+NumProcEvents, data)
+fit<-lm(LOSdays~NumTransfers+NumDiagnosis+NumNotes+NumCallouts+NumProcEvents+NumLabs, data)
 print(var(fit$residuals))
 
-BayesSamples<- PosteriorSample(x, y, a=8, b=100, m=c(0,0,0,0,0,0), V=diag(1,6,6) ) 
+BayesSamples<- PosteriorSample(x, y, a=8, b=100, m=c(0,0,0,0,0,0,0), V=diag(1,7,7) ) 
 
 p1<-BayesSamples%>%ggplot(aes(x=value)) +
   geom_histogram(aes(y=..density..), bins = 50, fill="skyblue", color="black") +
@@ -148,12 +148,12 @@ print(p1)
 betas<-BayesSamples%>%select(param, value)%>%group_by(param)%>%summarise(betas=mean(value))
 
 #Prediction
-test<-test_data%>%select(LOSdays,NumTransfers, NumDiagnosis, NumNotes, NumCallouts, NumProcEvents)
+test<-test_data%>%select(LOSdays,NumTransfers, NumDiagnosis, NumNotes, NumCallouts, NumProcEvents, NumLabs)
 x<-test%>%select(-LOSdays)%>%mutate(Intercept=1)%>%as.matrix()
 betas<-betas%>%arrange(match(param, colnames(x)))%>%filter(param!="sigmasq")%>%column_to_rownames(var = "param") %>% data.matrix()
 y_star<-x%*%betas
 
-p3<-data.frame(y=test$LOSdays, y_star=as.numeric(y_star))%>%filter(y_star>=0)%>%gather(key="data", value = "value")%>%
+p3<-data.frame(y=test$LOSdays, y_star=as.numeric(y_star))%>%gather(key="data", value = "value")%>%filter(value>=0)%>%
   ggplot(aes(value, col=data))+
   geom_histogram(aes(y=..density..), bins=100)
 ggplotly(p3)
