@@ -1,0 +1,115 @@
+---
+title: '3'
+author: "Chuhan Yue"
+date: "2023-10-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(plotly)
+```
+
+```{r}
+data <- read.csv("ab_data.csv")
+mimic3d <- read.csv("mimic3d.csv")
+df <- read.csv("train_data.csv")
+```
+
+```{r}
+old <- data %>% filter(landing_page == "old_page" & group == "control")
+new <- data %>% filter(landing_page == "new_page" & group == "treatment")
+old_distinct <- old %>% distinct(old$user_id, .keep_all = TRUE)
+new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
+```
+
+```{r}
+visitor_to_old <- nrow(old_distinct)
+visitor_to_new <- nrow(new_distinct)
+conversion_old <- sum(old_distinct$converted)
+conversion_new <- sum(new_distinct$converted)
+```
+
+```{r}
+alpha_prior <- 2
+beta_prior <- 20
+```
+
+```{r}
+MyClass <- setRefClass(
+  "MyClass",
+  fields = list(posterior_old = "numeric",posterior_new= "numeric"),
+  methods = list(
+    initialize = function() {
+      posterior_old<<-0
+      posterior_new<<-0
+      print("You initialized MyClass!")
+    },
+    generateData= function(size)
+    {
+      posterior_old <<- rbeta(size,alpha_prior+conversion_old,beta_prior+visitor_to_old-conversion_old)       
+      posterior_new <<- rbeta(size,alpha_prior+conversion_new,beta_prior+visitor_to_new-conversion_new)
+      # calculate new rate - old rate
+      mean(posterior_new > posterior_old)
+      #Riemann sum as safety check:
+      sapply(seq(0.001,0.999, length.out=size), function(size){
+      dbeta(size, alpha_prior+conversion_new,beta_prior+visitor_to_new-conversion_new)*
+      pbeta(size, alpha_prior+conversion_old, beta_prior+visitor_to_old-conversion_old)})%>%sum()/size
+    },
+    calculateMean= function()
+    {
+      posterior_Old <<- data.frame(old_rate=c(posterior_old))
+      posterior_New <<- data.frame(new_rate=c(posterior_new))
+      mean_old<- mean(posterior_Old$old_rate)
+      mean_new<- mean(posterior_New$new_rate)
+      cat("Mean of conversion rate on old page is", mean_old, "\n")
+      cat("Mean of conversion rate on new page is", mean_new, "\n")
+      return(list(mean_old,mean_new))
+    },
+    pplot= function(x)
+    {
+      result2 <- calculateMean()
+      mean_old<-result2[[1]]
+      mean_new<-result2[[2]]
+      fig_2 <- ggplot() +geom_density(aes(x = posterior_Old$old_rate), fill = "blue", alpha = 0.5)+
+      geom_density(aes(x = posterior_New$new_rate), fill = "red", alpha = 0.5) +
+      geom_vline(xintercept = mean_old, linetype = "dashed", color = "blue") +
+      geom_vline(xintercept = mean_new, linetype = "dashed", color = "red") +
+      labs(title = "Probability Density Comparison", subtitle = "New page vs. old page",
+          x = "Conversion rate",
+          y = "Density") +
+      annotate("text", x = 0.1187, y = 300, label= "New Page") +
+      annotate("text", x = 0.1205, y = 300, label= "Old Page") +
+      annotate("text", x = mean_old, y = 0, label = paste("mean of old\n", round(mean_old, 6)), vjust = 0.5, size = 3) +
+      annotate("text", x = mean_new, y = 0, label = paste("mean of new\n", round(mean_new, 6)), vjust = 0.5, size = 3) +
+      annotate("segment", x = mean_old, xend = mean_new, y = 500, yend = 500, colour = "black", linewidth = 2, arrow = arrow()) +
+      annotate("text", x = (mean_old + mean_new)/2, y = 480,
+               label=paste(round(mean_old-mean_new,6))) +
+                scale_color_manual(values = c("red", "blue"), labels = c("new page", "old page"))
+
+fig_2
+    }
+  )
+)
+```
+```{r}
+my_object<- MyClass$new()
+my_object$generateData(100)
+my_object$calculateMean()
+my_object$pplot()
+```
+
+```{r}
+my_sequence<-seq(from = 100, to = 1000, by = 100)
+for(i in my_sequence){
+my_object<- MyClass$new()
+my_object$generateData(i)
+my_object$calculateMean()
+my_object$pplot()
+  cat("the size is", i, "\n")
+}
+```
+
+
+
