@@ -136,7 +136,7 @@ y<-matrix(data$LOSdays, ncol=1)
 fit<-lm(LOSdays~NumTransfers+NumDiagnosis+NumNotes+NumCallouts+NumProcEvents+NumLabs, data)
 print(var(fit$residuals))
 
-BayesSamples<- PosteriorSample(x, y, a=8, b=100, m=c(0,0,0,0,0,0,0), V=diag(1,7,7) ) 
+BayesSamples<- PosteriorSample(x, y, a=8, b=100, m=as.numeric(fit$coefficients), V=diag(1,7,7) ) 
 
 p1<-BayesSamples%>%ggplot(aes(x=value)) +
   geom_histogram(aes(y=..density..), bins = 50, fill="skyblue", color="black") +
