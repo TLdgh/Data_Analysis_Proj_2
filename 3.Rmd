@@ -59,19 +59,21 @@ MyClass <- setRefClass(
     },
     calculateMean= function()
     {
-      posterior_Old <<- data.frame(old_rate=c(posterior_old))
-      posterior_New <<- data.frame(new_rate=c(posterior_new))
+      posterior_Old <- data.frame(old_rate=c(posterior_old))
+      posterior_New <- data.frame(new_rate=c(posterior_new))
       mean_old<- mean(posterior_Old$old_rate)
       mean_new<- mean(posterior_New$new_rate)
       cat("Mean of conversion rate on old page is", mean_old, "\n")
       cat("Mean of conversion rate on new page is", mean_new, "\n")
-      return(list(mean_old,mean_new))
+      return(list(mean_old,mean_new,posterior_Old,posterior_New))
     },
     pplot= function(x)
     {
       result2 <- calculateMean()
       mean_old<-result2[[1]]
       mean_new<-result2[[2]]
+      posterior_Old<-result2[[3]]
+      posterior_New<-result2[[4]]
       fig_2 <- ggplot() +geom_density(aes(x = posterior_Old$old_rate), fill = "blue", alpha = 0.5)+
       geom_density(aes(x = posterior_New$new_rate), fill = "red", alpha = 0.5) +
       geom_vline(xintercept = mean_old, linetype = "dashed", color = "blue") +
@@ -93,6 +95,7 @@ fig_2
   )
 )
 ```
+
 ```{r}
 my_object<- MyClass$new()
 my_object$generateData(100)
