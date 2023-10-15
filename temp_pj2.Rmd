@@ -12,7 +12,6 @@ library(plotly)
 
 ```{r}
 data <- read.csv("ab_data.csv")
-head(data)
 ```
 
 ```{r}
@@ -30,16 +29,11 @@ mimic3d <- read.csv("mimic3d.csv")
 #View(data)
 nrow(mimic3d)*0.8 # take 47180 rows as training, rest 20% as  patients.csv
 training <- mimic3d[1:47180,]
-head(training)
-tail(training)
 patients <- data[47181:nrow(mimic3d),]
-head(patients)
 ```
 
 ```{r}
 df <- read.csv("train_data.csv")
-head(df)
-tail(df)
 ```
 
 ```{r}
@@ -51,7 +45,7 @@ count(new, new$converted == 1)
 
 ```{r}
 nrow(old)
-old[!duplicated(old$user_id),]
+old <- old[!duplicated(old$user_id),]
 ```
 
 ```{r}
@@ -85,7 +79,7 @@ fig_1 <- plot_ly(
 fig_1
 ```
 
-```{r, warning=FALSE}
+```{r, include=FALSE, warning=FALSE}
 library(rstan)
 
 data <- list(
@@ -134,7 +128,8 @@ prob_new_better <- mean(p_difference > 0)
 cat("\n Probability that the new page is better than the old page:", prob_new_better, "\n")
 
 ```
-```{r}
+
+```{r, include=FALSE}
 p_difference <- posterior_samples$p_difference
 df <- data.frame(p_difference)
 
@@ -146,10 +141,9 @@ ggplot(df, aes(x = p_difference)) +
        x = "new page rate- old page rate",
        y = "Density") +
   theme_minimal()
-
 ```
 
-```{r}
+```{r, include=FALSE}
 # posterior for old page
 p_old <- posterior_samples$p_old
 df1 <- data.frame(p_old)
@@ -169,6 +163,21 @@ ggplot(df2) +
 
 ```
 
+Proof of parameters in posterior:  
+Let $p$ be the conversion rate, consider a series of Bernoulli distribution (every visitor has probability $p$ to convert or $(1-p)$ to not convert), $i.e. binomial(s,n|p)=\binom{n}{s}p^{s}(1-p)^{n-s}$, where $p\in[0,1]$.  
+$Prior=P(p)=Beta(\alpha,\beta)$, $likelihood=P(s|p)=\binom{n}{s}p^{s}(1-p)^{n-s}$.  
+By Bayesian: $P(p|s)=\frac{P(s|p) \cdot P(p)}{P(s)}$,  
+$P(s)=\int P(s|p) \cdot P(p)dp$  
+$=\int_{0}^{1}\binom{n}{s}p^{s}(1-p)^{n-s}\frac{1}{B(\alpha,\beta)}p^{\alpha-1}(1-p)^{\beta-1}dp$  
+$=\frac{\binom{n}{s}}{B(\alpha,\beta)}\int_{0}^{1}p^{s+\alpha-1}(1-p)^{n-s+\beta-1}dp$  
+$=\binom{n}{s}\frac{B(s+\alpha,n+\beta-s)}{B(\alpha,\beta)}\int_{0}^{1}\underbrace{\frac{1}{B(s+\alpha,n+\beta-s)}p^{s+\alpha-1}(1-p)^{n+\beta-s-1}}_{this\ is \ a \ Beta \ with \ parameters\  s+\alpha,n+\beta-s}dp$  
+$=\binom{n}{s}\frac{B(\alpha+s,\beta+n-s)}{B(\alpha,\beta)} \underbrace{\int_{0}^{1}Beta(\alpha+s,\beta+n-s)dp}_{=1\ since\ integral\ on\ [0,1]\ is\ 1\ for\ Beta}$  
+$=\binom{n}{s}\frac{B(\alpha+s,\beta+n-s)}{B(\alpha,\beta)}$  
+Hence, $P(p|s)=\frac{P(s|p) \cdot P(p)}{P(s)}$  
+$=\frac{\binom{n}{s}p^{s}(1-p)^{n-s}\frac{1}{B(\alpha,\beta)}p^{\alpha-1}(1-p)^{\beta-1}}{\binom{n}{s}\frac{B(\alpha+s,\beta+n-s)}{B(\alpha,\beta)}}$  
+$=\frac{1}{B(\alpha+s,\beta+n-s)}p^{\alpha+s-1}(1-p)^{\beta+n-s-1}$  
+$=Beta(\alpha+s,\beta+n-s)$  
+
 ```{r}
 visitor_to_old <- nrow(old_distinct)
 visitor_to_new <- nrow(new_distinct)
@@ -182,7 +191,7 @@ beta_prior <- 20
 posterior_old <- rbeta(1000000, alpha_prior+conversion_old, beta_prior+visitor_to_old-conversion_old)
 posterior_new <- rbeta(1000000, alpha_prior+conversion_new, beta_prior+visitor_to_new-conversion_new)
 
-# calculate new rate - old rate
+# calculate prob of new rate > old rate
 mean(posterior_new > posterior_old)
 
 #Riemann sum as safety check:
