@@ -241,7 +241,12 @@ probability <- function(n, alpha_prior, conversion_old, beta_prior, visitor_to_o
   return(list(rate_difference = rate_difference, riemann_sum = riemann_sum))
 }
 
-n_100 <- probability(100, alpha_prior, conversion_old, beta_prior, visitor_to_old, conversion_new, visitor_to_new)
+results <- data.frame(n = integer(0), rate_difference = numeric(0), riemann_sum = numeric(0))
 
-print(n_100)
+for (n in seq(100, 1000000, by = 100)) {
+  result <- probability(n, alpha_prior, conversion_old, beta_prior, visitor_to_old, conversion_new, visitor_to_new)
+  results <- rbind(results, data.frame(n = n, rate_difference = result$rate_difference, riemann_sum = result$riemann_sum))
+}
+
+print(results)
 ```
