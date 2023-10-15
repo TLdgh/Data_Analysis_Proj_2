@@ -108,16 +108,30 @@ PosteriorSample<-function(x, y, a, b, m, V, sim_n=100000){
   
   
   # Sample from the posterior
-  sigma_sim<-1/rgamma(sim_n, shape=a_star, rate=b_star) #simulate variance
+  sigma_sim<-1/rgamma(sim_n, shape=a_star, rate=b_star)
+  sigma_sim<-data.frame(sigmasq=sigma_sim) #simulate variance
+  
   #pairwise multiplication
-  betas_sim<-sqrt(sigma_sim)*MASS::mvrnorm(n = sim_n, mu = rep(0, length(m)), CovM) + matrix(rep(c(mu), each = sim_n), ncol=length(m), byrow = FALSE)
+  betas_sim<-(sqrt(sigma_sim$sigmasq)*MASS::mvrnorm(n = sim_n, mu = rep(0, length(m)), CovM) + matrix(rep(c(mu), each = sim_n), ncol=length(m), byrow = FALSE))
+  betas_sim<-data.frame(betas_sim)
+  colnames(betas_sim)<-c(colnames(x))
   
-  params<-data.frame(betas_sim, sigma_sim)
-  colnames(params)<-c(colnames(x), "sigmasq")
+  params<-cbind(betas_sim, sigma_sim)
   
+  # Loss for betas: chosen to be the mean squared residual
+  loss <- function(x, y){mean((y - x)^2)}
+  bs <- apply(betas_sim, MARGIN = 2, function(x){optimize(function(y) loss(y, x), interval = c(min(x), max(x)))$minimum})
+
+  # Loss for sigma: chosen to be the mean of the abs(residual)
+  loss_sigma <- function(x, y) {mean(abs(y - x))}
+  s <- apply(sigma_sim, MARGIN = 2, function(x){optimize(function(y) loss_sigma(y, x),interval = c(min(x), max(x)))$minimum}) 
+  
+  params_est <- data.frame(val=c(bs,s))%>%t()
+
   params<-gather(params, key="param", value="value")
   params$labels<-factor(params$param, labels =c(colnames(x), 'sigma^2'))
-  
+  params$params_est<-as.numeric(params_est[, match(params$param, colnames(params_est))])
+
   return(params)
 }
 
@@ -132,10 +146,13 @@ fit<-lm(LOSdays~NumTransfers+NumDiagnosis+NumNotes+NumCallouts+NumProcEvents+Num
 print(var(fit$residuals))
 
 BayesSamples<- PosteriorSample(x, y, a=8, b=100, m=as.numeric(fit$coefficients), V=diag(1,7,7) ) 
+df_vline<-distinct(BayesSamples, labels, params_est)
 
 p1<-BayesSamples%>%ggplot(aes(x=value)) +
   geom_histogram(aes(y=..density..), bins = 50, fill="skyblue", color="black") +
   geom_density(colour='blue', linewidth = 0.5) +
+  geom_vline(data=df_vline, aes(xintercept = params_est), linetype = 'dashed', size = 1)+
+  geom_text(data=df_vline, aes(x= params_est, label = paste("Param_Est:", round(params_est,4)), y=Inf),size = 2,hjust=0, vjust=2) + 
   facet_wrap(~labels, scales = 'free',labeller = label_parsed) + theme_bw() +
   labs(x = 'Parameters', y = 'Density',title = 'Posterior Density')
 print(p1)
