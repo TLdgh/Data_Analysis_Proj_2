@@ -6,15 +6,15 @@ a<-10
 b<-0.5
 sigmasq<-1/rgamma(1, shape=a, rate=b)
 
-m<-c(0,0)
-V<-matrix(c(10,0,0,10), nrow = 2, byrow = TRUE)
+m<-c(0,0,5)
+V<-matrix(c(10,0,3, 0,4,6, 2,5,10), nrow = length(m), byrow = TRUE)
 betas<-MASS::mvrnorm(n=1, mu=m, Sigma = sigmasq*V)
 
-params_true <- data.frame(beta0=betas[1], beta1=betas[2], sigmasq=sigmasq)
+params_true <- data.frame(beta0=betas[1], beta1=betas[2], beta2=betas[3], sigmasq=sigmasq)
 
 
 n<-2000
-x<-matrix(c(rep(1,n), rnorm(n, mean = 12.5, sd=2)), ncol = 2, byrow = FALSE)
+x<-matrix(c(rep(1,n), rnorm(n, mean = 12.5, sd=2), rbeta(n, 12.5, 2)), ncol = length(m), byrow = FALSE)
 e<-rnorm(n, mean=0, sd=sqrt(sigmasq) )
 y<-x%*%betas+e # This is the true model
 
@@ -36,24 +36,20 @@ PosteriorSample<-function(x, y, a, b, m, V, sim_n=100000){
   # Sample from the posterior
   sigma_sim<-1/rgamma(sim_n, shape=a_star, rate=b_star) #simulate variance
   #pairwise multiplication
-  betas_sim<-sqrt(sigma_sim)*MASS::mvrnorm(n = sim_n, mu = c(0, 0), CovM) + matrix(rep(c(mu), each = sim_n), ncol = 2, byrow = FALSE)
+  betas_sim<-sqrt(sigma_sim)*MASS::mvrnorm(n = sim_n, mu = rep(0, length(m)), CovM) + matrix(rep(c(mu), each = sim_n), ncol=length(m), byrow = FALSE)
   
   params<-data.frame(betas_sim, sigma_sim)
-  colnames(params)<-c("beta0", "beta1", "sigmasq")
+  colnames(params)<-c(paste0("beta", seq(0,length(m)-1)), "sigmasq")
   
   params<-gather(params, key="param", value="value")
-  params$labels<-factor(params$param, labels =c('beta0', 'beta1', 'sigma^2'))
+  params$labels<-factor(params$param, labels =c(paste0("beta", seq(0,length(m)-1)), 'sigma^2'))
   
   return(params)
 }
 
 #under correct model specification
-params_sim_correct<- PosteriorSample(x, y, a=10, b=0.5, m=c(0,0), V=matrix(c(10,0,0,10), nrow = 2, byrow = TRUE) ) 
-params_sim_correct<- params_sim_correct%>%mutate(true_param = case_when(
-  param == "beta0" ~ params_true$beta0,
-  param == "beta1" ~ params_true$beta1,
-  param == "sigmasq" ~ params_true$sigmasq
-))
+params_sim_correct<- PosteriorSample(x, y, a=10, b=0.5, m=c(0,0,5), V=matrix(c(10,0,3, 0,4,6, 2,5,10), nrow = ncol(x), byrow = TRUE) ) 
+params_sim_correct$true_param <- as.numeric(params_true[, match(params_sim_correct$param, names(params_true))])
 df_vline<-distinct(params_sim_correct, labels, true_param)
 
 p1<-params_sim_correct%>%ggplot(aes(x=value)) +
@@ -66,7 +62,7 @@ p1<-params_sim_correct%>%ggplot(aes(x=value)) +
 
 
 #under incorrect model specification
-params_sim_incorrect<- PosteriorSample(x, y, a=2, b=10, m=c(-2,-10), V=matrix(c(100,2.8,5,0.51), nrow = 2, byrow = TRUE) ) 
+params_sim_incorrect<- PosteriorSample(x, y, a=2, b=10, m=c(-2,-10, 28), V=matrix(c(100,10,37, 20,47,61, 2,58,150), nrow=ncol(x), byrow = TRUE) ) 
 params_sim_incorrect<- params_sim_incorrect%>%mutate(true_param = case_when(
   param == "beta0" ~ params_true$beta0,
   param == "beta1" ~ params_true$beta1,
