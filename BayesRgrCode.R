@@ -81,3 +81,7 @@ p2<-params_sim_incorrect%>%ggplot(aes(x=value)) +
 print(p1)
 print(p2)
 
+a<-8
+b<-100
+plot(seq(1,50,length.out=1000), b^a/gamma(a)*(seq(1,50,length.out=1000))^(-a-1)*exp(-b/seq(1,50,length.out=1000)))
+
