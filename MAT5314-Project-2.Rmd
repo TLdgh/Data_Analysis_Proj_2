@@ -109,25 +109,23 @@ PosteriorSample<-function(x, y, a, b, m, V, sim_n=100000){
   
   # Sample from the posterior
   sigma_sim<-1/rgamma(sim_n, shape=a_star, rate=b_star)
-  sigma_sim<-data.frame(sigmasq=sigma_sim) #simulate variance
-  
   #pairwise multiplication
-  betas_sim<-(sqrt(sigma_sim$sigmasq)*MASS::mvrnorm(n = sim_n, mu = rep(0, length(m)), CovM) + matrix(rep(c(mu), each = sim_n), ncol=length(m), byrow = FALSE))
-  betas_sim<-data.frame(betas_sim)
-  colnames(betas_sim)<-c(colnames(x))
-  
-  params<-cbind(betas_sim, sigma_sim)
+  betas_sim<-sqrt(sigma_sim)*MASS::mvrnorm(n = sim_n, mu = rep(0, length(m)), CovM) + matrix(rep(c(mu), each = sim_n), ncol=length(m), byrow = FALSE)
+
+  params<-data.frame(betas_sim, sigma_sim)
+  colnames(params)<-c(colnames(x), "sigmasq")
+
   
   # Loss for betas: chosen to be the mean squared residual
   loss <- function(x, y){mean((y - x)^2)}
-  bs <- apply(betas_sim, MARGIN = 2, function(x){optimize(function(y) loss(y, x), interval = c(min(x), max(x)))$minimum})
+  bs <- params%>%select(-sigmasq)%>%apply(MARGIN = 2, function(x){optimize(function(y) loss(y, x), interval = c(min(x), max(x)))$minimum})
 
   # Loss for sigma: chosen to be the mean of the abs(residual)
   loss_sigma <- function(x, y) {mean(abs(y - x))}
-  s <- apply(sigma_sim, MARGIN = 2, function(x){optimize(function(y) loss_sigma(y, x),interval = c(min(x), max(x)))$minimum}) 
+  s <- params%>%select(sigmasq)%>%apply(MARGIN = 2, function(x){optimize(function(y) loss_sigma(y, x),interval = c(min(x), max(x)))$minimum}) 
+  
   
   params_est <- data.frame(val=c(bs,s))%>%t()
-
   params<-gather(params, key="param", value="value")
   params$labels<-factor(params$param, labels =c(colnames(x), 'sigma^2'))
   params$params_est<-as.numeric(params_est[, match(params$param, colnames(params_est))])
