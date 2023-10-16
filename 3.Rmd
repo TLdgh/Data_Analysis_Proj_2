@@ -91,4 +91,25 @@ ggplot(frame, aes(x = size, y = value)) +
      geom_point(shape = 16, color = "blue") +
      labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
 
+
 ```
+
+```{r}
+old_distinct<-data.frame(Id=1:1000, converted=rbinom(1000, 1, 0.52))
+new_distinct<-data.frame(Id=1:1000, converted=rbinom(1000, 1, 0.483))
+frame<-data.frame()
+alpha_prior_old<-2
+alpha_prior_new<-2
+beta_prior_old<-20
+beta_prior_new<-20
+for(i in 1:10){
+ my_instance <- MyClass$new()
+ my_instance$takeSample(old_distinct,new_distinct,i)
+ my_instance$takeSubset(alpha_prior_old,alpha_prior_new,beta_prior_old,beta_prior_new)
+ frame<-rbind(frame,my_instance$calculateMean())
+}
+ggplot(frame, aes(x = size, y = value)) +
+     geom_point(shape = 16, color = "blue") +
+     labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
+```
+
