@@ -37,34 +37,34 @@ Old_sample<-data.frame()
 New_sample<-data.frame()
 result<-data.frame()
 for(i in my_sequence){
-      sample_result<-data.frame()
-      sample_indices1 <- sample(1:nrow(old_distinct), 100, replace = FALSE)
-      old_sample<-old_distinct[sample_indices1, ]
-      old_distinct<-old_distinct[-sample_indices1, ]
-      rownames(old_distinct)<-c(1:nrow(old_distinct))
-      Old_sample<-rbind(Old_sample,old_sample)
-      
-      sample_indices2 <- sample(1:nrow(new_distinct), 100, replace = FALSE)
-      new_sample<-new_distinct[sample_indices2, ]
-      new_distinct<-new_distinct[-sample_indices2, ]
-      rownames(new_distinct)<-c(1:nrow(new_distinct))
-      New_sample<-rbind(New_sample,new_sample)
-      
-      visitor_to_old <- nrow(Old_sample)
-      visitor_to_new <- nrow(New_sample)
-      conversion_old <- sum(Old_sample$converted)
-      conversion_new <- sum(New_sample$converted)
-      posterior_old <- rbeta(1000000,alpha_prior+conversion_old,beta_prior+visitor_to_old-conversion_old)       
-      posterior_new <- rbeta(1000000,alpha_prior+conversion_new,beta_prior+visitor_to_new-conversion_new)
-      value<-mean(posterior_new > posterior_old)
-      
-      posterior_Old <- data.frame(old_rate=c(posterior_old))
-      posterior_New <- data.frame(new_rate=c(posterior_new))
-      mean_old<- mean(posterior_Old$old_rate)
-      mean_new<- mean(posterior_New$new_rate)
-      
-      sample_result<-cbind(i,value,mean_old,mean_new)
-      result <- rbind(result, sample_result)
+  sample_result<-data.frame()
+  sample_indices1 <- sample(1:nrow(old_distinct), 100, replace = FALSE)
+  old_sample<-old_distinct[sample_indices1, ]
+  old_distinct<-old_distinct[-sample_indices1, ]
+  rownames(old_distinct)<-c(1:nrow(old_distinct))
+  Old_sample<-rbind(Old_sample,old_sample)
+  
+  sample_indices2 <- sample(1:nrow(new_distinct), 100, replace = FALSE)
+  new_sample<-new_distinct[sample_indices2, ]
+  new_distinct<-new_distinct[-sample_indices2, ]
+  rownames(new_distinct)<-c(1:nrow(new_distinct))
+  New_sample<-rbind(New_sample,new_sample)
+  
+  visitor_to_old <- nrow(Old_sample)
+  visitor_to_new <- nrow(New_sample)
+  conversion_old <- sum(Old_sample$converted)
+  conversion_new <- sum(New_sample$converted)
+  posterior_old <- rbeta(1000000,alpha_prior+conversion_old,beta_prior+visitor_to_old-conversion_old)       
+  posterior_new <- rbeta(1000000,alpha_prior+conversion_new,beta_prior+visitor_to_new-conversion_new)
+  value<-mean(posterior_new > posterior_old)
+  
+  posterior_Old <- data.frame(old_rate=c(posterior_old))
+  posterior_New <- data.frame(new_rate=c(posterior_new))
+  mean_old<- mean(posterior_Old$old_rate)
+  mean_new<- mean(posterior_New$new_rate)
+  
+  sample_result<-cbind(i,value,mean_old,mean_new)
+  result <- rbind(result, sample_result)
 }
 ```
 
@@ -74,6 +74,57 @@ result$interval<-result[,3]-result[,4]
 plot(result[,1], result[,5], main = "interval", xlab = "X-Axis", ylab = "Y-Axis", pch = 19, col = "blue")
 
 
+```
+
+
+
+# Teng's suggestion
+```{r}
+old_distinct<-data.frame(Id=1:1000, converted=rbinom(1000, 1, 0.52))
+new_distinct<-data.frame(Id=1:1000, converted=rbinom(1000, 1, 0.483))
+
+# Define the number of rows per subset
+rows_per_subset <- 10
+
+# Calculate the number of subsets
+num_subsets <- nrow(old_distinct) / rows_per_subset
+
+# Initialize prior
+alpha_prior_old <- 1
+alpha_prior_new <- 1
+beta_prior_old <- 1
+beta_prior_new <- 1
+
+result<-do.call(rbind, lapply(1:num_subsets, function(i){
+  #take the subset
+  start_row <- (i - 1) * rows_per_subset + 1
+  end_row <- i * rows_per_subset
+  old_sample<-old_distinct[seq(from=start_row, to=end_row), ]
+  new_sample<-new_distinct[seq(from=start_row, to=end_row), ]
+  
+  #calculate the posterior
+  visitor_to_old <- nrow(old_sample)
+  visitor_to_new <- nrow(new_sample)
+  conversion_old <- sum(old_sample$converted)
+  conversion_new <- sum(new_sample$converted)
+  posterior_old <- rbeta(100000,alpha_prior_old+conversion_old,beta_prior_old+visitor_to_old-conversion_old)       
+  posterior_new <- rbeta(100000,alpha_prior_new+conversion_new,beta_prior_new+visitor_to_new-conversion_new)
+  value<-mean(posterior_new > posterior_old)
+  
+  #update the prior by the posterior
+  alpha_prior_old<<-alpha_prior_old+conversion_old
+  alpha_prior_new<<-alpha_prior_new+conversion_new
+  beta_prior_old<<-beta_prior_old+visitor_to_old-conversion_old
+  beta_prior_new<<-beta_prior_new+visitor_to_new-conversion_new
+  
+  mean_old<- mean(posterior_old)
+  mean_new<- mean(posterior_new)
+  
+  result<-data.frame(n=end_row,value,mean_old,mean_new)
+  return(result)
+}))
+
+plot_ly(result, x=~n, y=~value, type="scatter", mode="markers")
 ```
 
 
