@@ -220,10 +220,9 @@ probability <- function(n, alpha_prior, conversion_old, beta_prior, visitor_to_o
   posterior_old <- rbeta(n, alpha_prior + conversion_old, beta_prior + visitor_to_old - conversion_old)
   posterior_new <- rbeta(n, alpha_prior + conversion_new, beta_prior + visitor_to_new - conversion_new)
   
-  posterior_Old <- data.frame(old_rate=c(posterior_old))
-  posterior_New <- data.frame(new_rate=c(posterior_new))
-  mean_old<- mean(posterior_Old$old_rate)
-  mean_new<- mean(posterior_New$new_rate)
+  mean_old<- mean(data.frame(old_rate=c(posterior_old))$old_rate)
+  mean_new<- mean(data.frame(new_rate=c(posterior_new))$new_rate)
+  value <- mean(posterior_old-posterior_new)
 
   # Calculate the new rate - old rate
   rate_difference <- mean(posterior_new > posterior_old)
@@ -234,24 +233,19 @@ probability <- function(n, alpha_prior, conversion_old, beta_prior, visitor_to_o
       pbeta(x, alpha_prior + conversion_old, beta_prior + visitor_to_old - conversion_old)
   }) %>% sum() / n
 
-  return(list(rate_difference = rate_difference, riemann_sum = riemann_sum))
+  return(list(rate_difference = rate_difference, riemann_sum = riemann_sum, mean_old = mean_old, mean_new = mean_new))
 }
 
-results <- data.frame(n = integer(0), rate_difference = numeric(0), riemann_sum = numeric(0))
+results <- data.frame(n = integer(0), rate_difference = numeric(0), riemann_sum = numeric(0), mean_old = numeric(0), mean_new = numeric(0))
 
-for (n in seq(100, 100000, by = 100)) {
+for (n in seq(100, 145310, by = 100)) {
   result <- probability(n, alpha_prior, conversion_old, beta_prior, visitor_to_old, conversion_new, visitor_to_new)
-  results <- rbind(results, data.frame(n = n, mean_old, mean_new))
+  result_df <- data.frame(n = n, rate_difference = result$rate_difference, riemann_sum = result$riemann_sum, mean_old = result$mean_old, mean_new = result$mean_new)
+  results <- rbind(results, result_df)
 }
 
 print(results)
 ```
-
 ```{r}
-posterior_Old <- data.frame(old_rate=c(posterior_old))
-posterior_New <- data.frame(new_rate=c(posterior_new))
-mean_old<- mean(posterior_Old$old_rate)
-mean_new<- mean(posterior_New$new_rate)
-mean_old
-mean_new
+
 ```
