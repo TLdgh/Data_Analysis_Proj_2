@@ -18,17 +18,11 @@ df <- read.csv("train_data.csv")
 ```
 
 ```{r}
+#cleaning data
 old <- data %>% filter(landing_page == "old_page" & group == "control")
 new <- data %>% filter(landing_page == "new_page" & group == "treatment")
 old_distinct <- old %>% distinct(old$user_id, .keep_all = TRUE)
 new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
-```
-
-```{r}
-visitor_to_old <- nrow(old_distinct)
-visitor_to_new <- nrow(new_distinct)
-conversion_old <- sum(old_distinct$converted)
-conversion_new <- sum(new_distinct$converted)
 ```
 
 ```{r}
@@ -37,82 +31,49 @@ beta_prior <- 20
 ```
 
 ```{r}
-MyClass <- setRefClass(
-  "MyClass",
-  fields = list(posterior_old = "numeric",posterior_new= "numeric"),
-  methods = list(
-    initialize = function() {
-      posterior_old<<-0
-      posterior_new<<-0
-      print("You initialized MyClass!")
-    },
-    generateData= function(size)
-    {
-      posterior_old <<- rbeta(size,alpha_prior+conversion_old,beta_prior+visitor_to_old-conversion_old)       
-      posterior_new <<- rbeta(size,alpha_prior+conversion_new,beta_prior+visitor_to_new-conversion_new)
-      # calculate new rate - old rate
-      mean(posterior_new > posterior_old)
-      #Riemann sum as safety check:
-      sapply(seq(0.001,0.999, length.out=size), function(size){
-      dbeta(size, alpha_prior+conversion_new,beta_prior+visitor_to_new-conversion_new)*
-      pbeta(size, alpha_prior+conversion_old, beta_prior+visitor_to_old-conversion_old)})%>%sum()/size
-    },
-    calculateMean= function()
-    {
+my_sequence<-seq(from = 100, to = 145100, by = 100)
+lastdata<-data.frame()
+Old_sample<-data.frame()
+New_sample<-data.frame()
+result<-data.frame()
+for(i in my_sequence){
+      sample_result<-data.frame()
+      sample_indices1 <- sample(1:nrow(old_distinct), 100, replace = FALSE)
+      old_sample<-old_distinct[sample_indices1, ]
+      old_distinct<-old_distinct[-sample_indices1, ]
+      rownames(old_distinct)<-c(1:nrow(old_distinct))
+      Old_sample<-rbind(Old_sample,old_sample)
+      
+      sample_indices2 <- sample(1:nrow(new_distinct), 100, replace = FALSE)
+      new_sample<-new_distinct[sample_indices2, ]
+      new_distinct<-new_distinct[-sample_indices2, ]
+      rownames(new_distinct)<-c(1:nrow(new_distinct))
+      New_sample<-rbind(New_sample,New_sample)
+      
+      visitor_to_old <- nrow(Old_sample)
+      visitor_to_new <- nrow(New_sample)
+      conversion_old <- sum(Old_sample$converted)
+      conversion_new <- sum(New_sample$converted)
+      posterior_old <- rbeta(1000000,alpha_prior+conversion_old,beta_prior+visitor_to_old-conversion_old)       
+      posterior_new <- rbeta(1000000,alpha_prior+conversion_new,beta_prior+visitor_to_new-conversion_new)
+      value<-mean(posterior_new > posterior_old)
+      
       posterior_Old <- data.frame(old_rate=c(posterior_old))
       posterior_New <- data.frame(new_rate=c(posterior_new))
       mean_old<- mean(posterior_Old$old_rate)
       mean_new<- mean(posterior_New$new_rate)
-      cat("Mean of conversion rate on old page is", mean_old, "\n")
-      cat("Mean of conversion rate on new page is", mean_new, "\n")
-      return(list(mean_old,mean_new,posterior_Old,posterior_New))
-    },
-    pplot= function(x)
-    {
-      result2 <- calculateMean()
-      mean_old<-result2[[1]]
-      mean_new<-result2[[2]]
-      posterior_Old<-result2[[3]]
-      posterior_New<-result2[[4]]
-      fig_2 <- ggplot() +geom_density(aes(x = posterior_Old$old_rate), fill = "blue", alpha = 0.5)+
-      geom_density(aes(x = posterior_New$new_rate), fill = "red", alpha = 0.5) +
-      geom_vline(xintercept = mean_old, linetype = "dashed", color = "blue") +
-      geom_vline(xintercept = mean_new, linetype = "dashed", color = "red") +
-      labs(title = "Probability Density Comparison", subtitle = "New page vs. old page",
-          x = "Conversion rate",
-          y = "Density") +
-      annotate("text", x = 0.1187, y = 300, label= "New Page") +
-      annotate("text", x = 0.1205, y = 300, label= "Old Page") +
-      annotate("text", x = mean_old, y = 0, label = paste("mean of old\n", round(mean_old, 6)), vjust = 0.5, size = 3) +
-      annotate("text", x = mean_new, y = 0, label = paste("mean of new\n", round(mean_new, 6)), vjust = 0.5, size = 3) +
-      annotate("segment", x = mean_old, xend = mean_new, y = 500, yend = 500, colour = "black", linewidth = 2, arrow = arrow()) +
-      annotate("text", x = (mean_old + mean_new)/2, y = 480,
-               label=paste(round(mean_old-mean_new,6))) +
-                scale_color_manual(values = c("red", "blue"), labels = c("new page", "old page"))
-
-fig_2
-    }
-  )
-)
-```
-
-```{r}
-my_object<- MyClass$new()
-my_object$generateData(100)
-my_object$calculateMean()
-my_object$pplot()
-```
-
-```{r}
-my_sequence<-seq(from = 100, to = 1000, by = 100)
-for(i in my_sequence){
-my_object<- MyClass$new()
-my_object$generateData(i)
-my_object$calculateMean()
-my_object$pplot()
-  cat("the size is", i, "\n")
+      
+      sample_result<-cbind(i,value,mean_old,mean_new)
+      result <- rbind(result, sample_result)
 }
 ```
 
+```{r}
+plot(result[,1], result[,2], main = "converge", xlab = "X-Axis", ylab = "Y-Axis", pch = 19, col = "blue")
+result$interval<-result[,3]-result[,4]
+plot(result[,1], result[,5], main = "interval", xlab = "X-Axis", ylab = "Y-Axis", pch = 19, col = "blue")
+
+
+```
 
 
