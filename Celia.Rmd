@@ -128,6 +128,7 @@ prob_new_better <- mean(p_difference > 0)
 cat("\n Probability that the new page is better than the old page:", prob_new_better, "\n")
 
 ```
+
 ```{r}
 p_difference <- posterior_samples$p_difference
 df <- data.frame(p_difference)
@@ -208,44 +209,75 @@ fig_2
 ```
 
 ```{r}
-visitor_to_old <- nrow(old_distinct)
-visitor_to_new <- nrow(new_distinct)
-conversion_old <- sum(old_distinct$converted)
-conversion_new <- sum(new_distinct$converted)
+old_distinct <- old %>% distinct(old$user_id, .keep_all = TRUE)
+new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
 alpha_prior <- 2
 beta_prior <- 20
-
-probability <- function(n, alpha_prior, conversion_old, beta_prior, visitor_to_old, conversion_new, visitor_to_new) {
-  # Generate posterior samples for old and new pages
-  posterior_old <- rbeta(n, alpha_prior + conversion_old, beta_prior + visitor_to_old - conversion_old)
-  posterior_new <- rbeta(n, alpha_prior + conversion_new, beta_prior + visitor_to_new - conversion_new)
+sub_old <- data.frame()
+sub_new <- data.frame()
+result <- data.frame()
+for(i in seq(100, 145200, by = 100)){
+  sampled_old <- old_distinct %>% sample_n(100) # sampling 100 rows from origin data
+  sampled_new <- new_distinct %>% sample_n(100) 
+  sub_old <- bind_rows(sub_old,sampled_old) # add sample to subset
+  sub_new <- bind_rows(sub_new,sampled_new) 
+  old_distinct <-anti_join(old_distinct,sampled_old) # drop sample from origin data
+  new_distinct <-anti_join(new_distinct,sampled_new)
+  visitor_to_old <- nrow(sub_old)
+  visitor_to_new <- nrow(sub_new)
+  conversion_old <- sum(sub_old$converted)
+  conversion_new <- sum(sub_new$converted)
+  # calculate posterior
+  posterior_old <- rbeta(1000000, alpha_prior+conversion_old, beta_prior+visitor_to_old-conversion_old)
+  posterior_new <- rbeta(1000000, alpha_prior+conversion_new, beta_prior+visitor_to_new-conversion_new)
   
+  # calculate prob of new rate > old rate
   mean_old<- mean(data.frame(old_rate=c(posterior_old))$old_rate)
   mean_new<- mean(data.frame(new_rate=c(posterior_new))$new_rate)
-  value <- mean(posterior_old-posterior_new)
-
-  # Calculate the new rate - old rate
-  rate_difference <- mean(posterior_new > posterior_old)
-
-  # Calculate Riemann sum as a safety check
-  riemann_sum <- sapply(seq(0.001, 0.999, length.out = n), function(x) {
-    dbeta(x, alpha_prior + conversion_new, beta_prior + visitor_to_new - conversion_new) *
-      pbeta(x, alpha_prior + conversion_old, beta_prior + visitor_to_old - conversion_old)
-  }) %>% sum() / n
-
-  return(list(rate_difference = rate_difference, riemann_sum = riemann_sum, mean_old = mean_old, mean_new = mean_new))
+  value <- mean(posterior_new > posterior_old)
+  sample_result <- data.frame(i = i, value = value, mean_old = mean_old, mean_new = mean_new)
+result <- rbind(result, sample_result) # store df with i's and values
 }
-
-results <- data.frame(n = integer(0), rate_difference = numeric(0), riemann_sum = numeric(0), mean_old = numeric(0), mean_new = numeric(0))
-
-for (n in seq(100, 145310, by = 100)) {
-  result <- probability(n, alpha_prior, conversion_old, beta_prior, visitor_to_old, conversion_new, visitor_to_new)
-  result_df <- data.frame(n = n, rate_difference = result$rate_difference, riemann_sum = result$riemann_sum, mean_old = result$mean_old, mean_new = result$mean_new)
-  results <- rbind(results, result_df)
-}
-
-print(results)
+View(result)
 ```
-```{r}
 
+```{r}
+#Draw the scatter diagram of value
+values <- result$value
+
+scatter_data <- data.frame(i = result$i, value = values)
+
+ggplot(scatter_data, aes(x = i, y = value)) +
+  geom_point() +
+  labs(x = "i", y = "Value") +
+  ggtitle("Scatter Plot of i vs. Value")
+```
+
+```{r}
+#Delete the column "value"
+result_mean <- result[, -which(names(result) == "value")]
+names(result_mean)[1] <- "n"
+result_mean
+
+result_long <- gather(result_mean, key = "Variable", value = "Value", mean_old, mean_new)
+
+View(result_long)
+```
+
+```{r}
+ggplot(result_long, aes(x = Variable, y = Value, fill = Variable)) +
+  geom_boxplot() +
+  labs(title = "Box Plot of mean_old and mean_new",
+       x = "Variable",
+       y = "Value") +
+  scale_fill_manual(values = c("mean_old" = "blue", "mean_new" = "red"))
+```
+
+```{r}
+ggplot(result_long, aes(x = n, y = Value, color = Variable)) +
+  geom_line() +
+  labs(title = "Line Plot of mean_old and mean_new",
+       x = "n",
+       y = "Value") +
+  scale_color_manual(values = c("mean_old" = "blue", "mean_new" = "red"))
 ```
