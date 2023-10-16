@@ -48,7 +48,7 @@ for(i in my_sequence){
       new_sample<-new_distinct[sample_indices2, ]
       new_distinct<-new_distinct[-sample_indices2, ]
       rownames(new_distinct)<-c(1:nrow(new_distinct))
-      New_sample<-rbind(New_sample,New_sample)
+      New_sample<-rbind(New_sample,new_sample)
       
       visitor_to_old <- nrow(Old_sample)
       visitor_to_new <- nrow(New_sample)
