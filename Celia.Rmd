@@ -187,15 +187,6 @@ sapply(seq(0.001,0.999, length.out=1000000), function(x){
 ```
 
 ```{r}
-posterior_Old <- data.frame(old_rate=c(posterior_old))
-posterior_New <- data.frame(new_rate=c(posterior_new))
-mean_old <- mean(posterior_Old$old_rate)
-mean_new <- mean(posterior_New$new_rate)
-cat("Mean of conversion rate on old page is", mean_old, "\n")
-cat("Mean of conversion rate on new page is", mean_new, "\n")
-```
-
-```{r}
 # plot density 
 fig_2 <- ggplot() +
   geom_density(aes(x = posterior_Old$old_rate), fill = "blue", alpha = 0.5) +
@@ -228,6 +219,11 @@ probability <- function(n, alpha_prior, conversion_old, beta_prior, visitor_to_o
   # Generate posterior samples for old and new pages
   posterior_old <- rbeta(n, alpha_prior + conversion_old, beta_prior + visitor_to_old - conversion_old)
   posterior_new <- rbeta(n, alpha_prior + conversion_new, beta_prior + visitor_to_new - conversion_new)
+  
+  posterior_Old <- data.frame(old_rate=c(posterior_old))
+  posterior_New <- data.frame(new_rate=c(posterior_new))
+  mean_old<- mean(posterior_Old$old_rate)
+  mean_new<- mean(posterior_New$new_rate)
 
   # Calculate the new rate - old rate
   rate_difference <- mean(posterior_new > posterior_old)
@@ -243,10 +239,19 @@ probability <- function(n, alpha_prior, conversion_old, beta_prior, visitor_to_o
 
 results <- data.frame(n = integer(0), rate_difference = numeric(0), riemann_sum = numeric(0))
 
-for (n in seq(100, 1000000, by = 100)) {
+for (n in seq(100, 100000, by = 100)) {
   result <- probability(n, alpha_prior, conversion_old, beta_prior, visitor_to_old, conversion_new, visitor_to_new)
-  results <- rbind(results, data.frame(n = n, rate_difference = result$rate_difference, riemann_sum = result$riemann_sum))
+  results <- rbind(results, data.frame(n = n, mean_old, mean_new))
 }
 
 print(results)
+```
+
+```{r}
+posterior_Old <- data.frame(old_rate=c(posterior_old))
+posterior_New <- data.frame(new_rate=c(posterior_new))
+mean_old<- mean(posterior_Old$old_rate)
+mean_new<- mean(posterior_New$new_rate)
+mean_old
+mean_new
 ```
