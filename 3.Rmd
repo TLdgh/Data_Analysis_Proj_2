@@ -112,10 +112,6 @@ ggplot(frame, aes(x = size, y = value)) +
 ```{r}
 old_distinct<-data.frame(Id=1:1000, converted=rbinom(1000, 1, 0.52))
 new_distinct<-data.frame(Id=1:1000, converted=rbinom(1000, 1, 0.483))
-alpha_prior_old<-2
-alpha_prior_new<-2
-beta_prior_old<-20
-beta_prior_new<-20
 
 my_instance <- MyClass$new(old_distinct=old_distinct, new_distinct=new_distinct,rows_per_subset = 100,
                            alpha_prior_old=2,
