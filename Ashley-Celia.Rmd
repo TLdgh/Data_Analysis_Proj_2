@@ -1,0 +1,131 @@
+---
+title: "Untitled"
+author: "Yang Lyu"
+date: "11/10/2023"
+output: pdf_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(plotly)
+```
+
+```{r}
+data <- read.csv("ab_data.csv")
+mimic3d <- read.csv("mimic3d.csv")
+df <- read.csv("train_data.csv")
+```
+
+```{r}
+#cleaning data
+old <- data %>% filter(landing_page == "old_page" & group == "control")
+new <- data %>% filter(landing_page == "new_page" & group == "treatment")
+old_distinct <- old %>% distinct(old$user_id, .keep_all = TRUE)
+new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
+```
+
+```{r}
+MyClass <- setRefClass(
+  "MyClass",
+  fields = list(old_sample= "data.frame",
+      new_sample = "data.frame",posterior_old="numeric",posterior_new="numeric",value="numeric",size="numeric"),
+  methods = list(
+initialize = function() {
+      old_sample<<-data.frame()
+      old_sample<<-data.frame()
+      posterior_old<<-0
+      posterior_new<<-0
+      value<<-0
+      size<<-0
+    },
+takeSample=function(old_distinct1,new_distinct1,i){
+  rows_per_subset<-100
+  start_row <- (i - 1) * rows_per_subset + 1
+  end_row <- i * rows_per_subset
+  old_sample<<-old_distinct1[seq(from=start_row, to=end_row), ]
+  new_sample<<-new_distinct1[seq(from=start_row, to=end_row), ]
+  size<<-i*100
+},
+takeSubset=function(alpha_prior_old,alpha_prior_new,beta_prior_old,beta_prior_new){
+  visitor_to_old <- nrow(old_sample)
+  visitor_to_new <- nrow(new_sample)
+  conversion_old <- sum(old_sample$converted)
+  conversion_new <- sum(new_sample$converted)
+  posterior_old <<- rbeta(100000,alpha_prior_old+conversion_old,beta_prior_old+visitor_to_old-conversion_old)       
+  posterior_new <<- rbeta(100000,alpha_prior_new+conversion_new,beta_prior_new+visitor_to_new-conversion_new)
+  value<<-mean(posterior_new > posterior_old)
+  alpha_prior_old<<-alpha_prior_old+conversion_old
+  alpha_prior_new<<-alpha_prior_new+conversion_new
+  beta_prior_old<<-beta_prior_old+visitor_to_old-conversion_old
+  beta_prior_new<<-beta_prior_new+visitor_to_new-conversion_new
+  return(list(alpha_prior_old,alpha_prior_new,beta_prior_old,beta_prior_new))
+},
+calculateMean=function(){
+  mean_old<- mean(posterior_old)
+  mean_new<- mean(posterior_new)
+  frame2<-cbind(size,value,mean_old,mean_new)
+  return(frame2)
+},
+creatplot=function(){
+  frame<-calculateMean()
+}
+)
+)
+```
+
+```{r}
+frame<-data.frame()
+alpha_prior_old<-2
+alpha_prior_new<-2
+beta_prior_old<-20
+beta_prior_new<-20
+for(i in 1:1450){
+ my_instance <- MyClass$new()
+ my_instance$takeSample(old_distinct,new_distinct,i)
+ my_instance$takeSubset(alpha_prior_old,alpha_prior_new,beta_prior_old,beta_prior_new)
+ frame<-rbind(frame,my_instance$calculateMean())
+}
+
+ggplot(frame, aes(x = size, y = value)) +
+     geom_point(shape = 16, color = "blue") +
+     labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
+
+
+```
+
+```{r}
+old_distinct<-data.frame(Id=1:1000, converted=rbinom(1000, 1, 0.52))
+new_distinct<-data.frame(Id=1:1000, converted=rbinom(1000, 1, 0.483))
+frame<-data.frame()
+alpha_prior_old<-2
+alpha_prior_new<-2
+beta_prior_old<-20
+beta_prior_new<-20
+for(i in 1:10){
+ my_instance <- MyClass$new()
+ my_instance$takeSample(old_distinct,new_distinct,i)
+ my_instance$takeSubset(alpha_prior_old,alpha_prior_new,beta_prior_old,beta_prior_new)
+ frame<-rbind(frame,my_instance$calculateMean())
+}
+ggplot(frame, aes(x = size, y = value)) +
+     geom_point(shape = 16, color = "blue") +
+     labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
+```
+
+```{r}
+frame<-rbind(frame,my_instance$calculateMean())
+frame
+```
+
+```{r}
+#Delete the column "value"
+result_mean <- frame[, -which(names(frame) == "value")]
+names(result_mean)[1] <- "n"
+result_mean
+
+result_long <- gather(result_mean, key = "Variable", value = "Value", mean_old, mean_new)
+
+View(result_long)
+```
