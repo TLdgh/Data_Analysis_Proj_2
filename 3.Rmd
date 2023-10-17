@@ -12,20 +12,6 @@ library(plotly)
 ```
 
 ```{r}
-data <- read.csv("ab_data.csv")
-mimic3d <- read.csv("mimic3d.csv")
-df <- read.csv("train_data.csv")
-```
-
-```{r}
-#cleaning data
-old <- data %>% filter(landing_page == "old_page" & group == "control")
-new <- data %>% filter(landing_page == "new_page" & group == "treatment")
-old_distinct <- old %>% distinct(old$user_id, .keep_all = TRUE)
-new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
-```
-
-```{r}
 MyClass <- setRefClass(
   "MyClass",
   fields = list(old_distinct= "data.frame",new_distinct = "data.frame",rows_per_subset="numeric",
@@ -93,31 +79,15 @@ MyClass <- setRefClass(
 ```
 
 ```{r}
-my_instance <- MyClass$new(old_distinct,new_distinct,rows_per_subset = 1000,
-                           alpha_prior_old=2,
-                           alpha_prior_new=2,
-                           beta_prior_old=20,
-                           beta_prior_new=20)
-
-my_instance$frame<-my_instance$calculateMean(my_instance$posteriors)
-
-
-ggplot(frame, aes(x = size, y = value)) +
-  geom_point(shape = 16, color = "blue") +
-  labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
-
-
-```
-
-```{r}
+# Test Case
 old_distinct<-data.frame(Id=1:1000, converted=rbinom(1000, 1, 0.52))
 new_distinct<-data.frame(Id=1:1000, converted=rbinom(1000, 1, 0.483))
 
-my_instance <- MyClass$new(old_distinct=old_distinct, new_distinct=new_distinct,rows_per_subset = 100,
-                           alpha_prior_old=2,
-                           alpha_prior_new=2,
-                           beta_prior_old=20,
-                           beta_prior_new=20)
+my_instance <- MyClass$new(old_distinct=old_distinct, new_distinct=new_distinct,rows_per_subset = 10,
+                           alpha_prior_old=1,
+                           alpha_prior_new=1,
+                           beta_prior_old=1,
+                           beta_prior_new=1)
 
 frame<-my_instance$calculateMean()
 
@@ -125,4 +95,51 @@ ggplot(frame, aes(x = size, y = value)) +
   geom_point(shape = 16, color = "blue") +
   labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
 ```
+
+```{r}
+data <- read.csv("ab_data.csv")
+mimic3d <- read.csv("mimic3d.csv")
+
+#cleaning data
+old <- data %>% filter(landing_page == "old_page" & group == "control")
+new <- data %>% filter(landing_page == "new_page" & group == "treatment")
+old_distinct <- old %>% distinct(old$user_id, .keep_all = TRUE)
+new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
+```
+
+```{r}
+#using non-informative priors
+my_instance <- MyClass$new(old_distinct,new_distinct,rows_per_subset = 1000,
+                           alpha_prior_old=1,
+                           alpha_prior_new=1,
+                           beta_prior_old=1,
+                           beta_prior_new=1)
+
+frame<-my_instance$calculateMean()
+
+
+ggplot(frame, aes(x = size, y = value)) +
+  geom_point(shape = 16, color = "blue") +
+  labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
+
+```
+
+```{r}
+#using informative priors
+my_instance <- MyClass$new(old_distinct,new_distinct,rows_per_subset = 1000,
+                           alpha_prior_old=2,
+                           alpha_prior_new=2,
+                           beta_prior_old=20,
+                           beta_prior_new=20)
+
+frame<-my_instance$calculateMean()
+
+
+ggplot(frame, aes(x = size, y = value)) +
+  geom_point(shape = 16, color = "blue") +
+  labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
+
+```
+
+
 
