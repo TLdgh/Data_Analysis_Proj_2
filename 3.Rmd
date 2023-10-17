@@ -41,6 +41,8 @@ MyClass <- setRefClass(
       .self$size<-numeric(0)
       .self$posteriors<-.self$GetPosteriors(old_distinct,new_distinct,rows_per_subset)
     },
+    
+    #take the sample of the data
     takeSample=function(old_distinct,new_distinct,rows_per_subset,i){
       start_row <- (i - 1) * rows_per_subset + 1
       end_row <- i * rows_per_subset
@@ -49,10 +51,13 @@ MyClass <- setRefClass(
       size<<-c(size, i*rows_per_subset)
       return(list(old_sample=old_sample, new_sample=new_sample))
     },
+    
+    #get the posteriors using subsets of data
     GetPosteriors=function(old_distinct,new_distinct,rows_per_subset){
       posterior_old<-list()
       posterior_new<-list()
       
+      #loop through the subsets defined by rows_per_subset
       for(i in 1:floor(min(nrow(old_distinct), nrow(new_distinct))/rows_per_subset) ){
         samples<-.self$takeSample(old_distinct,new_distinct,rows_per_subset,i)
         visitor_to_old <- nrow(samples$old_sample)
@@ -70,12 +75,16 @@ MyClass <- setRefClass(
       }
       return(list(posterior_old=posterior_old,posterior_new=posterior_new))
     },
+    
+    #calculate the posterior mean
     calculateMean=function(){
       mean_old<- sapply(posteriors$posterior_old, FUN=mean)
       mean_new<- sapply(posteriors$posterior_new, FUN=mean)
       frame2<-data.frame(size,value,mean_old,mean_new)
       return(frame2)
     },
+    
+    #create plots
     creatplot=function(){
       frame<-calculateMean()
     }
@@ -84,7 +93,7 @@ MyClass <- setRefClass(
 ```
 
 ```{r}
-my_instance <- MyClass$new(old_distinct,new_distinct,
+my_instance <- MyClass$new(old_distinct,new_distinct,rows_per_subset = 1000,
                            alpha_prior_old=2,
                            alpha_prior_new=2,
                            beta_prior_old=20,
