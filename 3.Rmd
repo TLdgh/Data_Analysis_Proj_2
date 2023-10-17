@@ -39,7 +39,7 @@ MyClass <- setRefClass(
       .self$beta_prior_new<-beta_prior_new
       .self$value<-numeric(0)
       .self$size<-numeric(0)
-      .self$posteriors<-.self$takeSubset(old_distinct,new_distinct,rows_per_subset)
+      .self$posteriors<-.self$GetPosteriors(old_distinct,new_distinct,rows_per_subset)
     },
     takeSample=function(old_distinct,new_distinct,rows_per_subset,i){
       start_row <- (i - 1) * rows_per_subset + 1
@@ -49,10 +49,10 @@ MyClass <- setRefClass(
       size<<-c(size, i*rows_per_subset)
       return(list(old_sample=old_sample, new_sample=new_sample))
     },
-    takeSubset=function(old_distinct,new_distinct,rows_per_subset){
+    GetPosteriors=function(old_distinct,new_distinct,rows_per_subset){
       posterior_old<-list()
       posterior_new<-list()
-
+      
       for(i in 1:floor(min(nrow(old_distinct), nrow(new_distinct))/rows_per_subset) ){
         samples<-.self$takeSample(old_distinct,new_distinct,rows_per_subset,i)
         visitor_to_old <- nrow(samples$old_sample)
@@ -103,17 +103,19 @@ ggplot(frame, aes(x = size, y = value)) +
 ```{r}
 old_distinct<-data.frame(Id=1:1000, converted=rbinom(1000, 1, 0.52))
 new_distinct<-data.frame(Id=1:1000, converted=rbinom(1000, 1, 0.483))
-frame<-data.frame()
 alpha_prior_old<-2
 alpha_prior_new<-2
 beta_prior_old<-20
 beta_prior_new<-20
-for(i in 1:10){
-  my_instance <- MyClass$new()
-  my_instance$takeSample(old_distinct,new_distinct,i)
-  my_instance$takeSubset(alpha_prior_old,alpha_prior_new,beta_prior_old,beta_prior_new)
-  frame<-rbind(frame,my_instance$calculateMean())
-}
+
+my_instance <- MyClass$new(old_distinct=old_distinct, new_distinct=new_distinct,rows_per_subset = 100,
+                           alpha_prior_old=2,
+                           alpha_prior_new=2,
+                           beta_prior_old=20,
+                           beta_prior_new=20)
+
+frame<-my_instance$calculateMean()
+
 ggplot(frame, aes(x = size, y = value)) +
   geom_point(shape = 16, color = "blue") +
   labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
