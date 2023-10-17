@@ -28,68 +28,74 @@ new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
 ```{r}
 MyClass <- setRefClass(
   "MyClass",
-  fields = list(old_sample= "data.frame",
-      new_sample = "data.frame",posterior_old="numeric",posterior_new="numeric",value="numeric",size="numeric"),
+  fields = list(old_distinct= "data.frame",new_distinct = "data.frame",rows_per_subset="numeric",
+                alpha_prior_old="numeric", alpha_prior_new="numeric", beta_prior_old="numeric", beta_prior_new="numeric",
+                value="numeric",size="numeric",posteriors="list"),
   methods = list(
-initialize = function() {
-      old_sample<<-data.frame()
-      old_sample<<-data.frame()
-      posterior_old<<-0
-      posterior_new<<-0
-      value<<-0
-      size<<-0
+    initialize = function(old_distinct,new_distinct,alpha_prior_old,alpha_prior_new,beta_prior_old,beta_prior_new,rows_per_subset){
+      .self$alpha_prior_old<-alpha_prior_old
+      .self$alpha_prior_new<-alpha_prior_new
+      .self$beta_prior_old<-beta_prior_old
+      .self$beta_prior_new<-beta_prior_new
+      .self$value<-numeric(0)
+      .self$size<-numeric(0)
+      .self$posteriors<-.self$takeSubset(old_distinct,new_distinct,rows_per_subset)
     },
-takeSample=function(old_distinct1,new_distinct1,i){
-  rows_per_subset<-100
-  start_row <- (i - 1) * rows_per_subset + 1
-  end_row <- i * rows_per_subset
-  old_sample<<-old_distinct1[seq(from=start_row, to=end_row), ]
-  new_sample<<-new_distinct1[seq(from=start_row, to=end_row), ]
-  size<<-i*100
-},
-takeSubset=function(alpha_prior_old,alpha_prior_new,beta_prior_old,beta_prior_new){
-  visitor_to_old <- nrow(old_sample)
-  visitor_to_new <- nrow(new_sample)
-  conversion_old <- sum(old_sample$converted)
-  conversion_new <- sum(new_sample$converted)
-  posterior_old <<- rbeta(100000,alpha_prior_old+conversion_old,beta_prior_old+visitor_to_old-conversion_old)       
-  posterior_new <<- rbeta(100000,alpha_prior_new+conversion_new,beta_prior_new+visitor_to_new-conversion_new)
-  value<<-mean(posterior_new > posterior_old)
-  alpha_prior_old<<-alpha_prior_old+conversion_old
-  alpha_prior_new<<-alpha_prior_new+conversion_new
-  beta_prior_old<<-beta_prior_old+visitor_to_old-conversion_old
-  beta_prior_new<<-beta_prior_new+visitor_to_new-conversion_new
-  return(list(alpha_prior_old,alpha_prior_new,beta_prior_old,beta_prior_new))
-},
-calculateMean=function(){
-  mean_old<- mean(posterior_old)
-  mean_new<- mean(posterior_new)
-  frame2<-cbind(size,value,mean_old,mean_new)
-  return(frame2)
-},
-creatplot=function(){
-  frame<-calculateMean()
-}
-)
+    takeSample=function(old_distinct,new_distinct,rows_per_subset,i){
+      start_row <- (i - 1) * rows_per_subset + 1
+      end_row <- i * rows_per_subset
+      old_sample<-old_distinct[seq(from=start_row, to=end_row), ]
+      new_sample<-new_distinct[seq(from=start_row, to=end_row), ]
+      size<<-c(size, i*rows_per_subset)
+      return(list(old_sample=old_sample, new_sample=new_sample))
+    },
+    takeSubset=function(old_distinct,new_distinct,rows_per_subset){
+      posterior_old<-list()
+      posterior_new<-list()
+
+      for(i in 1:floor(min(nrow(old_distinct), nrow(new_distinct))/rows_per_subset) ){
+        samples<-.self$takeSample(old_distinct,new_distinct,rows_per_subset,i)
+        visitor_to_old <- nrow(samples$old_sample)
+        visitor_to_new <- nrow(samples$new_sample)
+        conversion_old <- sum(samples$old_sample$converted)
+        conversion_new <- sum(samples$new_sample$converted)
+        posterior_old[[i]] <- rbeta(100000,alpha_prior_old+conversion_old,beta_prior_old+visitor_to_old-conversion_old)
+        posterior_new[[i]] <- rbeta(100000,alpha_prior_new+conversion_new,beta_prior_new+visitor_to_new-conversion_new)
+        value<<-c(value, mapply(function(x, y) {x>y}, posterior_new[[i]], posterior_old[[i]])%>%mean())
+        
+        alpha_prior_old<<-alpha_prior_old+conversion_old
+        alpha_prior_new<<-alpha_prior_new+conversion_new
+        beta_prior_old<<-beta_prior_old+visitor_to_old-conversion_old
+        beta_prior_new<<-beta_prior_new+visitor_to_new-conversion_new
+      }
+      return(list(posterior_old=posterior_old,posterior_new=posterior_new))
+    },
+    calculateMean=function(){
+      mean_old<- sapply(posteriors$posterior_old, FUN=mean)
+      mean_new<- sapply(posteriors$posterior_new, FUN=mean)
+      frame2<-data.frame(size,value,mean_old,mean_new)
+      return(frame2)
+    },
+    creatplot=function(){
+      frame<-calculateMean()
+    }
+  )
 )
 ```
 
 ```{r}
-frame<-data.frame()
-alpha_prior_old<-2
-alpha_prior_new<-2
-beta_prior_old<-20
-beta_prior_new<-20
-for(i in 1:1450){
- my_instance <- MyClass$new()
- my_instance$takeSample(old_distinct,new_distinct,i)
- my_instance$takeSubset(alpha_prior_old,alpha_prior_new,beta_prior_old,beta_prior_new)
- frame<-rbind(frame,my_instance$calculateMean())
-}
+my_instance <- MyClass$new(old_distinct,new_distinct,
+                           alpha_prior_old=2,
+                           alpha_prior_new=2,
+                           beta_prior_old=20,
+                           beta_prior_new=20)
+
+my_instance$frame<-my_instance$calculateMean(my_instance$posteriors)
+
 
 ggplot(frame, aes(x = size, y = value)) +
-     geom_point(shape = 16, color = "blue") +
-     labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
+  geom_point(shape = 16, color = "blue") +
+  labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
 
 
 ```
@@ -103,13 +109,13 @@ alpha_prior_new<-2
 beta_prior_old<-20
 beta_prior_new<-20
 for(i in 1:10){
- my_instance <- MyClass$new()
- my_instance$takeSample(old_distinct,new_distinct,i)
- my_instance$takeSubset(alpha_prior_old,alpha_prior_new,beta_prior_old,beta_prior_new)
- frame<-rbind(frame,my_instance$calculateMean())
+  my_instance <- MyClass$new()
+  my_instance$takeSample(old_distinct,new_distinct,i)
+  my_instance$takeSubset(alpha_prior_old,alpha_prior_new,beta_prior_old,beta_prior_new)
+  frame<-rbind(frame,my_instance$calculateMean())
 }
 ggplot(frame, aes(x = size, y = value)) +
-     geom_point(shape = 16, color = "blue") +
-     labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
+  geom_point(shape = 16, color = "blue") +
+  labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
 ```
 
