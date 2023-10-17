@@ -9,6 +9,7 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(plotly)
+library(tidyr)
 ```
 
 ```{r}
@@ -71,9 +72,9 @@ MyClass <- setRefClass(
     calculateMean=function(){
       mean_old<- sapply(posteriors$posterior_old, FUN=mean)
       mean_new<- sapply(posteriors$posterior_new, FUN=mean)
-      se_mean_old <- sapply(posteriors$posterior_old, FUN = sd) / sqrt(length(posteriors$posterior_old))
-      se_mean_new <- sapply(posteriors$posterior_new, FUN = sd) / sqrt(length(posteriors$posterior_new))
-      frame2<-data.frame(size,value,mean_old,mean_new)
+      se_mean_old <<- sapply(posteriors$posterior_old, FUN = sd) / sqrt(length(posteriors$posterior_old))
+      se_mean_new <<- sapply(posteriors$posterior_new, FUN = sd) / sqrt(length(posteriors$posterior_new))
+      frame2<-data.frame(size,value,mean_old,mean_new, se_mean_old, se_mean_new)
       return(frame2)
     },
     
@@ -179,10 +180,11 @@ frame5<-my_instance$calculateMean()
 ggplot(frame5, aes(x = size, y = value)) +
   geom_point(shape = 16, color = "blue") +
   labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
+```
+```{r}
+#Mean_old & Mean_new Plot
 
-
-#Delete the column "value", subset size = 500
-result_mean <- frame3[, -which(names(frame1) == "value")]
+result_mean <- frame5[, -which(names(frame5) == "value")]
 names(result_mean)[1] <- "size"
 result_mean
 
@@ -198,13 +200,76 @@ ggplot(result_long5, aes(x = size, y = Mean, color = Variable)) +
 ```
 
 ```{r}
-ggplot(result_long5, aes(x = size, y = Mean, color = Variable)) +
-  geom_line() +
-  geom_ribbon(aes(ymin = Mean - ifelse(Variable == "mean_old", se_mean_old, se_mean_new),
-                    ymax = Mean + ifelse(Variable == "mean_old", se_mean_old, se_mean_new)),
-              alpha = 0.2, fill = "orange") +
+#Mean_old & 95% CI Plot
+quantile0.025 <- quantile(frame5$mean_old, 0.025)
+quantile0.975 <- quantile(frame5$mean_old, 0.975)
+
+confidence_data <- data.frame(
+  size = frame5$size,
+  quantile0.025 = quantile0.025,
+  mean_old = frame5$mean_old,
+  mean_new = frame5$mean_new,
+  quantile0.975 = quantile0.975,
+  se_mean_old = frame5$se_mean_old,
+  se_mean_new = frame5$se_mean_new
+)
+
+plot_mean_old <- ggplot(confidence_data, aes(x = size, y = mean_old)) +
+  geom_line(color = "blue") +
+  geom_ribbon(aes(ymin = quantile0.025, ymax = quantile0.975), fill = "blue", alpha = 0.2) +
+  labs(title = "Mean_old Comparison with Confidence Intervals",
+       x = "Sample Size",
+       y = "Mean_old")
+plot_mean_old
+```
+
+```{r}
+#Mean_new & 95% CI Plot
+quantile0.025_new <- quantile(frame5$mean_new, 0.025)
+quantile0.975_new <- quantile(frame5$mean_new, 0.975)
+
+confidence_data_new <- data.frame(
+  size = frame5$size,
+  quantile0.025_new = quantile0.025_new,
+  mean_old = frame5$mean_old,
+  mean_new = frame5$mean_new,
+  quantile0.975_new = quantile0.975_new,
+  se_mean_old = frame5$se_mean_old,
+  se_mean_new = frame5$se_mean_new
+)
+
+plot_mean_new <- ggplot(confidence_data_new, aes(x = size, y = mean_new)) +
+  geom_line(color = "red") +
+  geom_ribbon(aes(ymin = quantile0.025_new, ymax = quantile0.975_new), fill = "red", alpha = 0.2) +
+  labs(title = "Mean_new Comparison with Confidence Intervals",
+       x = "Sample Size",
+       y = "Mean_new")
+plot_mean_new
+```
+
+```{r}
+#Combined plot
+combined_data <- data.frame(
+  size = confidence_data$size,
+  mean_old = confidence_data$mean_old,
+  mean_new = confidence_data_new$mean_new,
+  quantile0.025_old = confidence_data$quantile0.025,
+  quantile0.975_old = confidence_data$quantile0.975,
+  quantile0.025_new = confidence_data_new$quantile0.025_new,
+  quantile0.975_new = confidence_data_new$quantile0.975_new
+)
+
+combined_plot <- ggplot(combined_data, aes(x = size)) +
+  geom_line(aes(y = mean_old), color = "blue", linetype = "solid") +
+  geom_line(aes(y = mean_new), color = "red", linetype = "solid") +
+  geom_ribbon(aes(ymin = quantile0.025_old, ymax = quantile0.975_old), fill = "blue", alpha = 0.35) +
+  geom_ribbon(aes(ymin = quantile0.025_new, ymax = quantile0.975_new), fill = "red", alpha = 0.2) +
   labs(title = "Mean Comparison with Confidence Intervals",
        x = "Sample Size",
        y = "Mean") +
-  scale_color_manual(values = c("mean_old" = "blue", "mean_new" = "red"))
+  scale_color_manual(values = c("blue", "red"))
+
+print(combined_plot)
 ```
+
+
