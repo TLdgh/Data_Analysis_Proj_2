@@ -76,11 +76,6 @@ MyClass <- setRefClass(
       se_mean_new <<- sapply(posteriors$posterior_new, FUN = sd) / sqrt(length(posteriors$posterior_new))
       frame2<-data.frame(size,value,mean_old,mean_new, se_mean_old, se_mean_new)
       return(frame2)
-    },
-    
-    #create plots
-    creatplot=function(){
-      frame<-calculateMean()
     }
   )
 )
@@ -167,7 +162,7 @@ ggplot(result_long1, aes(x = size, y = Mean, color = Variable)) +
 ```
 
 ```{r}
-#using informative priors, subset size = 500
+#using informative priors, subset size = 100
 my_instance <- MyClass$new(old_distinct,new_distinct,rows_per_subset = 500,
                            alpha_prior_old=2,
                            alpha_prior_new=2,
