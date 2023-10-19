@@ -34,11 +34,13 @@ table(mimic3d$ethnicity)
 # Pick cate data and valued them
 cate_data <- mimic3d_clean %>% transmute(
   LOSdays_Less2 = ifelse(LOSdays <= 2, 1, 0), 
-  gender = as.numeric(factor(gender, levels = c("F", "M"), labels = c(0, 1))), 
-  admit_type = as.numeric(factor(admit_type, levels = c("ELECTIVE","EMERGENCY","NEWBORN","URGENT"), labels = c(0,1,2,3))),
-  insurance = as.numeric(factor(insurance, levels = c("Government","Medicaid","Medicare","Private","Self Pay"), labels = c(0,1,2,3,4))
-  ))
+  gender = factor(gender, levels = c("F", "M"), labels = c(0, 1)), 
+  admit_type = factor(admit_type, levels = c("ELECTIVE","EMERGENCY","NEWBORN","URGENT"), labels = c(0,1,2,3)),
+  insurance = factor(insurance, levels = c("Government","Medicaid","Medicare","Private","Self Pay"), labels = c(0,1,2,3,4))
+  )
 cate_data <- cbind(cate_data, mimic3d_clean$ExpiredHospital, mimic3d_clean$LOSgroupNum)
+names <- c("LOSdays_Less2","gender","admit_type","insurance","ExpiredHospital","LOSgroupNum")
+colnames(cate_data) <- names
 View(cate_data)
 ```
 
@@ -53,8 +55,8 @@ create_list <- function(df) {
   # Create an empty list
   my_list <- list()
   # Create and populate data frames and add them to the list
-  for (i in 2:6) {
-    df_name <- paste0("df", i - 1)
+  for (i in 2:ncol(df)) {
+    df_name <- colnames(df)[i]
     new_df <- data.frame(df[, 1], df[, i])
     my_list[[df_name]] <- new_df
   }
@@ -65,20 +67,13 @@ create_list(cate_data)
 ```
 
 ```{r}
-chi_square_test <- function(list, index){
-  my_df <- create_list(cate_data)[[index]]
-  chi_square_table <- table(my_df)
-  chi_square_result <- chisq.test(chi_square_table)
-  return(chi_square_result)
+chi_square_test <- function(df){
+  for (v in colnames(df)[2:length(colnames(df))]){
+    my_df <- create_list(df)[[v]]
+    chi_square_table <- table(my_df)
+    chi_square_result <- chisq.test(chi_square_table)
+    cat("\nP-value of LOSdays and ",v,"is",chi_square_result$p.value)
+  }
 }
-chi_square_test(create_list(cate_data), 1)
-cat("*Chi square test on LOSdays and gender has p_value 0.01364")
-chi_square_test(create_list(cate_data), 2)
-cat("*Chi square test on LOSdays and  admit_type has p_value <2.2*10^-16")
-chi_square_test(create_list(cate_data), 3)
-cat("*Chi square test on LOSdays and  insurance has p_value <2.2*10^-16")
-chi_square_test(create_list(cate_data), 4)
-cat("*Chi square test on LOSdays and  ExpiredHospital has p_value <2.2*10^-16")
-chi_square_test(create_list(cate_data), 5)
-cat("*Chi square test on LOSdays and LOSgroupNum has p_value <2.2*10^-16")
+chi_square_test(cate_data)
 ```
