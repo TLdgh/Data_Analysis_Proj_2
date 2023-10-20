@@ -93,7 +93,3 @@ BayesianRegression<-setRefClass(
     }
   )
 )
-
-test<-BayesianRegression$new(train_data, c("LOSdays"), c("NumTransfers"), prior_sigma=c(8,10), prior_beta=list(m=c(0,0), V=matrix(c(10,3,4,6), nrow=2, byrow = TRUE)) )
-test$PosteriorPlot()
-test$PredictionPlot(test_data)
