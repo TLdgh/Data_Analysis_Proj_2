@@ -149,7 +149,7 @@ ggplot(frame0, aes(x = size, y = value)) +
 
 ```{r}
 #using informative priors, subset size = 100
-my_instance <- MyClass$new(old_distinct,new_distinct,rows_per_subset = 500,
+my_instance <- MyClass$new(old_distinct,new_distinct,rows_per_subset = 100,
                            alpha_prior_old=2,
                            alpha_prior_new=2,
                            beta_prior_old=20,
