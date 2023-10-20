@@ -30,6 +30,7 @@ CategoryDependence <- setRefClass(
         my_df <- create_list()[[v]]
         chi_square_table <- table(my_df)
         chi_square_result <- chisq.test(chi_square_table)
+        # Perform pvalue into df
         p.value[which(colnames(df)==v)] <- chi_square_result$p.value
         return(p.value)
       }
