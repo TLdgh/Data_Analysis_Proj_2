@@ -128,23 +128,6 @@ ggplot(frame0, aes(x = size, y = value)) +
 ```
 
 ```{r}
-#using informative priors, subset size = 1000
-my_instance <- MyClass$new(old_distinct,new_distinct,rows_per_subset = 1000,
-                           alpha_prior_old=2,
-                           alpha_prior_new=2,
-                           beta_prior_old=20,
-                           beta_prior_new=20)
-
-frame1<-my_instance$calculateMean()
-
-
-ggplot(frame1, aes(x = size, y = value)) +
-  geom_point(shape = 16, color = "blue") +
-  labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
-
-```
-
-```{r}
 #Delete the column "value"
 result_mean <- frame1[, -which(names(frame1) == "value")]
 names(result_mean)[1] <- "size"
@@ -169,24 +152,25 @@ my_instance <- MyClass$new(old_distinct,new_distinct,rows_per_subset = 500,
                            beta_prior_old=20,
                            beta_prior_new=20)
 
-frame5<-my_instance$calculateMean()
+frame1<-my_instance$calculateMean()
 
 
-ggplot(frame5, aes(x = size, y = value)) +
+ggplot(frame1, aes(x = size, y = value)) +
   geom_point(shape = 16, color = "blue") +
   labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
 ```
+
 ```{r}
 #Mean_old & Mean_new Plot
 
-result_mean <- frame5[, -which(names(frame5) == "value")]
+result_mean <- frame1[, -which(names(frame1) == "value")]
 names(result_mean)[1] <- "size"
 result_mean
 
 #reorganize into long format
-result_long5 <- gather(result_mean, key = "Variable", value = "Mean", mean_old, mean_new)
+result_long1 <- gather(result_mean, key = "Variable", value = "Mean", mean_old, mean_new)
 
-ggplot(result_long5, aes(x = size, y = Mean, color = Variable)) +
+ggplot(result_long1, aes(x = size, y = Mean, color = Variable)) +
   geom_line() +
   labs(title = "Mean Comparison",
        x = "Size",
@@ -196,17 +180,17 @@ ggplot(result_long5, aes(x = size, y = Mean, color = Variable)) +
 
 ```{r}
 #Mean_old & 95% CI Plot
-quantile0.025 <- quantile(frame5$mean_old, 0.025)
-quantile0.975 <- quantile(frame5$mean_old, 0.975)
+quantile0.025 <- quantile(frame1$mean_old, 0.025)
+quantile0.975 <- quantile(frame1$mean_old, 0.975)
 
 confidence_data <- data.frame(
-  size = frame5$size,
+  size = frame1$size,
   quantile0.025 = quantile0.025,
-  mean_old = frame5$mean_old,
-  mean_new = frame5$mean_new,
+  mean_old = frame1$mean_old,
+  mean_new = frame1$mean_new,
   quantile0.975 = quantile0.975,
-  se_mean_old = frame5$se_mean_old,
-  se_mean_new = frame5$se_mean_new
+  se_mean_old = frame1$se_mean_old,
+  se_mean_new = frame1$se_mean_new
 )
 
 plot_mean_old <- ggplot(confidence_data, aes(x = size, y = mean_old)) +
@@ -220,17 +204,17 @@ plot_mean_old
 
 ```{r}
 #Mean_new & 95% CI Plot
-quantile0.025_new <- quantile(frame5$mean_new, 0.025)
+quantile0.025_new <- quantile(frame1$mean_new, 0.025)
 quantile0.975_new <- quantile(frame5$mean_new, 0.975)
 
 confidence_data_new <- data.frame(
-  size = frame5$size,
+  size = frame1$size,
   quantile0.025_new = quantile0.025_new,
-  mean_old = frame5$mean_old,
-  mean_new = frame5$mean_new,
+  mean_old = frame1$mean_old,
+  mean_new = frame1$mean_new,
   quantile0.975_new = quantile0.975_new,
-  se_mean_old = frame5$se_mean_old,
-  se_mean_new = frame5$se_mean_new
+  se_mean_old = frame1$se_mean_old,
+  se_mean_new = frame1$se_mean_new
 )
 
 plot_mean_new <- ggplot(confidence_data_new, aes(x = size, y = mean_new)) +
