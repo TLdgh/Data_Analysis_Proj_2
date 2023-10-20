@@ -26,6 +26,7 @@ library(tidyverse)
 library(kableExtra)
 library(htmlwidgets)
 library(webshot)
+source("CodeSpace.R")
 ```
 
 # Introduction
@@ -83,7 +84,7 @@ One can see that asymptotically when we have a large sample size n, the mean of 
 # Method
 ```{r}
 ab_data<-read.csv("ab_data.csv", header = TRUE)
-mimic3d<-read.csv("mimic3d.csv", header = TRUE)
+mimic3d<-read.csv("mimic3d.csv", header = TRUE)%>%select(-c("insurance", "religion", "marital_status"))%>%na.omit()
 ```
 
 ```{r}
@@ -96,5 +97,32 @@ ab_data<-slice(ab_data, -c(1877)) #drop the duplicated row for the ID 773192
 ```{r}
 cat("Each ID has an unique value: ", length(unique(ab_data$user_id))==nrow(ab_data))
 ```
+
+```{r}
+#Bayesian Regression Analysis
+train_data<-mimic3d[1:47180,]
+test_data<-mimic3d[47181:nrow(mimic3d),]
+
+RegressionTest<-BayesianRegression$new(train_data, c("LOSdays"), c("NumTransfers"), prior_sigma=c(8,10), prior_beta=list(m=c(0,0), V=matrix(c(10,3,4,6), nrow=2, byrow = TRUE)) )
+RegressionTest$PosteriorPlot()
+RegressionTest$PredictionPlot(test_data)
+```
+
+```{R}
+# Transform categorical data
+cate_data <- mimic3d_clean %>% transmute(
+  LOSdays_Less2 = ifelse(LOSdays <= 2, 1, 0), 
+  gender = factor(gender, levels = c("F", "M"), labels = c(0, 1)), 
+  admit_type = factor(admit_type, levels = c("ELECTIVE","EMERGENCY","NEWBORN","URGENT"), labels = c(0,1,2,3)),
+  insurance = factor(insurance, levels = c("Government","Medicaid","Medicare","Private","Self Pay"), labels = c(0,1,2,3,4))
+  )
+cate_data <- cbind(cate_data, mimic3d_clean$ExpiredHospital, mimic3d_clean$LOSgroupNum)
+names <- c("LOSdays_Less2","gender","admit_type","insurance","ExpiredHospital","LOSgroupNum")
+colnames(cate_data) <- names
+
+CategoryTest <- CategoryDependence$new(df = cate_data)
+CaregoryTest$chi_square_test()
+```
+
 
 # References
