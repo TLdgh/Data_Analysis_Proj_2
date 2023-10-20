@@ -83,7 +83,7 @@ One can see that asymptotically when we have a large sample size n, the mean of 
 # Method
 ```{r}
 ab_data<-read.csv("ab_data.csv", header = TRUE)
-mimic3d<-read.csv("mimic3d.csv", header = TRUE)
+mimic3d<-read.csv("mimic3d.csv", header = TRUE)%>%select(-c("insurance", "religion", "marital_status"))%>%na.omit()
 ```
 
 ```{r}
@@ -96,5 +96,87 @@ ab_data<-slice(ab_data, -c(1877)) #drop the duplicated row for the ID 773192
 ```{r}
 cat("Each ID has an unique value: ", length(unique(ab_data$user_id))==nrow(ab_data))
 ```
+
+```{r}
+#Bayesian Regression Analysis
+PosteriorSample<-function(x, y, a, b, m, V, sim_n=100000){
+  # Calculate the parameters for the posterior
+  mu<-solve(t(x)%*%x + solve(V))%*%(t(x)%*%y + solve(V)%*%m)
+  CovM<-solve(t(x)%*%x + solve(V))
+  a_star<-n/2+a
+  b_star<-0.5*(t(m)%*%solve(V)%*%m -t(mu)%*%solve(CovM)%*%mu + t(y)%*%y +2*b)
+  
+  
+  # Sample from the posterior
+  sigma_sim<-1/rgamma(sim_n, shape=a_star, rate=b_star)
+  #pairwise multiplication
+  betas_sim<-sqrt(sigma_sim)*MASS::mvrnorm(n = sim_n, mu = rep(0, length(m)), CovM) + matrix(rep(c(mu), each = sim_n), ncol=length(m), byrow = FALSE)
+  
+  params<-data.frame(betas_sim, sigma_sim)
+  colnames(params)<-c(colnames(x), "sigmasq")
+  
+  
+  # Loss for betas: chosen to be the mean squared residual
+  loss <- function(x, y){mean((y - x)^2)}
+  bs <- params%>%select(-sigmasq)%>%apply(MARGIN = 2, function(x){optimize(function(y) loss(y, x), interval = c(min(x), max(x)))$minimum})
+  
+  # Loss for sigma: chosen to be the mean of the abs(residual)
+  loss_sigma <- function(x, y) {mean(abs(y - x))}
+  s <- params%>%select(sigmasq)%>%apply(MARGIN = 2, function(x){optimize(function(y) loss_sigma(y, x),interval = c(min(x), max(x)))$minimum}) 
+  
+  
+  params_est <- data.frame(val=c(bs,s))%>%t()
+  params<-gather(params, key="param", value="value")
+  params$labels<-factor(params$param, labels =c(colnames(x), 'sigma^2'))
+  params$params_est<-as.numeric(params_est[, match(params$param, colnames(params_est))])
+  
+  return(params)
+}
+
+train_data<-mimic3d[1:47180,]
+test_data<-mimic3d[47181:nrow(mimic3d),]
+
+data<-train_data%>%select(LOSdays,NumTransfers, NumDiagnosis, NumNotes, NumCallouts, NumProcEvents, NumLabs)
+x<-data%>%select(-LOSdays)%>%mutate(Intercept=1, .before=NumTransfers)%>%as.matrix()
+y<-matrix(data$LOSdays, ncol=1)
+
+fit<-lm(LOSdays~NumTransfers+NumDiagnosis+NumNotes+NumCallouts+NumProcEvents+NumLabs, data)
+print(var(fit$residuals))
+
+BayesSamples<- PosteriorSample(x, y, a=8, b=100, m=as.numeric(fit$coefficients), V=diag(1,7,7) ) 
+df_vline<-distinct(BayesSamples, labels, params_est)
+
+p1<-BayesSamples%>%ggplot(aes(x=value)) +
+  geom_histogram(aes(y=..density..), bins = 50, fill="skyblue", color="black") +
+  geom_density(colour='blue', linewidth = 0.5) +
+  geom_vline(data=df_vline, aes(xintercept = params_est), linetype = 'dashed', size = 1)+
+  geom_text(data=df_vline, aes(x= params_est, label = paste("Param_Est:", round(params_est,4)), y=Inf),size = 2,hjust=0, vjust=2) + 
+  facet_wrap(~labels, scales = 'free',labeller = label_parsed) + theme_bw() +
+  labs(x = 'Parameters', y = 'Density',title = 'Posterior Density')
+
+betas<-BayesSamples%>%select(param, value)%>%group_by(param)%>%summarise(betas=mean(value))
+
+#Prediction
+test<-test_data%>%select(LOSdays,NumTransfers, NumDiagnosis, NumNotes, NumCallouts, NumProcEvents, NumLabs)
+x<-test%>%select(-LOSdays)%>%mutate(Intercept=1)%>%as.matrix()
+betas<-betas%>%arrange(match(param, colnames(x)))%>%filter(param!="sigmasq")%>%column_to_rownames(var = "param") %>% data.matrix()
+y_star<-x%*%betas
+
+```
+
+```{r}
+print(p1)
+
+p3<-data.frame(y=test$LOSdays, y_star=as.numeric(y_star))%>%gather(key="data", value = "value")%>%filter(value>=0)%>%
+  plot_ly(x = ~value, color=~data, type = "histogram",nbinsx=200)%>% 
+  layout(
+    title = "Histogram Plot",
+    xaxis = list(title = "X-Axis Label"),
+    yaxis = list(title = "Frequency"),
+    bargap = 0.5
+  )
+print(p3)
+```
+
 
 # References
