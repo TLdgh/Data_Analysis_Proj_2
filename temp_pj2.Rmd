@@ -24,13 +24,6 @@ print("Number of missing values: ")
 sum(is.na(data))
 ```
 
-```{r}
-mimic3d <- read.csv("mimic3d.csv")
-#View(data)
-nrow(mimic3d)*0.8 # take 47180 rows as training, rest 20% as  patients.csv
-training <- mimic3d[1:47180,]
-patients <- data[47181:nrow(mimic3d),]
-```
 
 ```{r}
 df <- read.csv("train_data.csv")
@@ -266,3 +259,48 @@ View(result)
 ```{r}
 plot(result)
 ```
+
+```{r}
+old_distinct <- old %>% distinct(old$user_id, .keep_all = TRUE)
+new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
+alpha_prior <- 2
+beta_prior <- 20
+sub_old <- data.frame()
+sub_new <- data.frame()
+result <- data.frame()
+for(i in seq(100, 145174, by = 100)){
+  sampled_old <- old_distinct[1:100,] # sampling 100 rows from origin data
+  sampled_new <- new_distinct[1:100,]
+  sub_old <- bind_rows(sub_old,sampled_old) # add sample to subset
+  sub_new <- bind_rows(sub_new,sampled_new) 
+  old_distinct <-anti_join(old_distinct,sampled_old) # drop sample from origin data
+  new_distinct <-anti_join(new_distinct,sampled_new)
+  visitor_to_old <- nrow(sub_old)
+  visitor_to_new <- nrow(sub_new)
+  conversion_old <- sum(sub_old$converted)
+  conversion_new <- sum(sub_new$converted)
+  # calculate posterior
+  posterior_old <- rbeta(1000000, alpha_prior+conversion_old, beta_prior+visitor_to_old-conversion_old)
+  posterior_new <- rbeta(1000000, alpha_prior+conversion_new, beta_prior+visitor_to_new-conversion_new)
+  # calculate prob of new rate > old rate
+  value <- mean(posterior_new > posterior_old)
+  sample_result <- rbind(c(i,value))
+  result <- rbind(result, sample_result) # store df with i's and values
+}
+View(result)
+```
+```{r}
+plot(result)
+```
+
+```{r}
+mimic3d <- read.csv("mimic3d.csv")
+#View(data)
+nrow(mimic3d)*0.8 # take 47180 rows as training, rest 20% as  patients.csv
+training <- mimic3d[1:47180,]
+patients <- data[47181:nrow(mimic3d),]
+train_data <- read.csv()
+```
+
+
+
