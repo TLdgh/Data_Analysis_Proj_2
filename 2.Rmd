@@ -7,9 +7,8 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(dplyr)
 library(plotly)
-library(tidyr)
+library(tidyverse)
 ```
 
 ```{r}
@@ -128,23 +127,6 @@ ggplot(frame0, aes(x = size, y = value)) +
 ```
 
 ```{r}
-#Delete the column "value"
-result_mean <- frame1[, -which(names(frame1) == "value")]
-names(result_mean)[1] <- "size"
-result_mean
-
-#reorganize into long format
-result_long1 <- gather(result_mean, key = "Variable", value = "Mean", mean_old, mean_new)
-
-ggplot(result_long1, aes(x = size, y = Mean, color = Variable)) +
-  geom_line() +
-  labs(title = "Mean Comparison",
-       x = "Size",
-       y = "Mean") +
-  scale_color_manual(values = c("mean_old" = "blue", "mean_new" = "red"))
-```
-
-```{r}
 #using informative priors, subset size = 100
 my_instance <- MyClass$new(old_distinct,new_distinct,rows_per_subset = 500,
                            alpha_prior_old=2,
@@ -205,7 +187,7 @@ plot_mean_old
 ```{r}
 #Mean_new & 95% CI Plot
 quantile0.025_new <- quantile(frame1$mean_new, 0.025)
-quantile0.975_new <- quantile(frame5$mean_new, 0.975)
+quantile0.975_new <- quantile(frame1$mean_new, 0.975)
 
 confidence_data_new <- data.frame(
   size = frame1$size,
