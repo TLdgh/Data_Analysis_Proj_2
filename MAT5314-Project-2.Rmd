@@ -27,7 +27,10 @@ library(tidyverse)
 library(kableExtra)
 library(htmlwidgets)
 library(webshot)
-library(gridExtra)
+#library(gridExtra)
+```
+
+```{r}
 source("CodeSpace.R")
 source("TestSpace.R")
 ```
@@ -127,8 +130,8 @@ ggplot(frame1, aes(x = size, y = value)) +
   labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
 
 #combine the two plots
-combined_plot <- grid.arrange(plot0, plot1, ncol = 2)
-print(combined_plot)
+#combined_plot <- grid.arrange(plot0, plot1, ncol = 2)
+#print(combined_plot)
 ```
 
 ```{r}
@@ -155,8 +158,14 @@ my_instance$PlotCI()%>%print()
 #Bayesian Regression Analysis
 RegressionTest<-BayesianRegression$new(train_data, c("LOSdays"), c("NumTransfers"), prior_sigma=c(8,10), prior_beta=list(m=c(0,0), V=matrix(c(10,3,4,6), nrow=2, byrow = TRUE)) )
 RegressionTest$PosteriorPlot()%>%print()
-RegressionTest$PredictionPlot(test_data)%>%print()
+PredictP<-RegressionTest$PredictionPlot(test_data)
+
+saveWidget(widget = PredictP, file = "./Figures/PredictP.html")
+shots<-webshot(url = "./Figures/PredictP.html", file = "./Figures/PredictP.png", delay = 1, zoom = 2, vheight = 400, vwidth = 500)
 ```
 
+```{r, echo=FALSE, fig.align='center', fig.cap = "Prediction Plot"}
+knitr::include_graphics("./Figures/PredictP.png")
+```
 
 # References
