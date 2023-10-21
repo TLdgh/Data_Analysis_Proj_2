@@ -7,78 +7,8 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(dplyr)
 library(plotly)
-library(tidyr)
-```
-
-```{r}
-MyClass <- setRefClass(
-  "MyClass",
-  fields = list(old_distinct= "data.frame",new_distinct = "data.frame",rows_per_subset="numeric",
-                alpha_prior_old="numeric", alpha_prior_new="numeric", beta_prior_old="numeric", beta_prior_new="numeric",
-                value="numeric",size="numeric",posteriors="list",se_mean_old = "numeric",
-  se_mean_new = "numeric"),
-  methods = list(
-    initialize = function(old_distinct,new_distinct,alpha_prior_old,alpha_prior_new,beta_prior_old,beta_prior_new,rows_per_subset){
-      .self$alpha_prior_old<-alpha_prior_old
-      .self$alpha_prior_new<-alpha_prior_new
-      .self$beta_prior_old<-beta_prior_old
-      .self$beta_prior_new<-beta_prior_new
-      .self$value<-numeric(0)
-      .self$size<-numeric(0)
-      .self$se_mean_old <- numeric(0)  # 添加初始化值
-      .self$se_mean_new <- numeric(0)
-      .self$posteriors<-.self$GetPosteriors(old_distinct,new_distinct,rows_per_subset)
-      .self$se_mean_old <- se_mean_old
-      .self$se_mean_new <- se_mean_new
-    },
-    
-    #take the sample of the data
-    takeSample=function(old_distinct,new_distinct,rows_per_subset,i){
-      start_row <- (i - 1) * rows_per_subset + 1
-      end_row <- i * rows_per_subset
-      old_sample<-old_distinct[seq(from=start_row, to=end_row), ]
-      new_sample<-new_distinct[seq(from=start_row, to=end_row), ]
-      size<<-c(size, i*rows_per_subset)
-      return(list(old_sample=old_sample, new_sample=new_sample))
-    },
-    
-    #get the posteriors using subsets of data
-    GetPosteriors=function(old_distinct,new_distinct,rows_per_subset){
-      posterior_old<-list()
-      posterior_new<-list()
-      
-      #loop through the subsets defined by rows_per_subset
-      for(i in 1:floor(min(nrow(old_distinct), nrow(new_distinct))/rows_per_subset) ){
-        samples<-.self$takeSample(old_distinct,new_distinct,rows_per_subset,i)
-        visitor_to_old <- nrow(samples$old_sample)
-        visitor_to_new <- nrow(samples$new_sample)
-        conversion_old <- sum(samples$old_sample$converted)
-        conversion_new <- sum(samples$new_sample$converted)
-        posterior_old[[i]] <- rbeta(100000,alpha_prior_old+conversion_old,beta_prior_old+visitor_to_old-conversion_old)
-        posterior_new[[i]] <- rbeta(100000,alpha_prior_new+conversion_new,beta_prior_new+visitor_to_new-conversion_new)
-        value<<-c(value, mapply(function(x, y) {x>y}, posterior_new[[i]], posterior_old[[i]])%>%mean())
-        
-        alpha_prior_old<<-alpha_prior_old+conversion_old
-        alpha_prior_new<<-alpha_prior_new+conversion_new
-        beta_prior_old<<-beta_prior_old+visitor_to_old-conversion_old
-        beta_prior_new<<-beta_prior_new+visitor_to_new-conversion_new
-      }
-      return(list(posterior_old=posterior_old,posterior_new=posterior_new))
-    },
-    
-    #calculate the posterior mean
-    calculateMean=function(){
-      mean_old<- sapply(posteriors$posterior_old, FUN=mean)
-      mean_new<- sapply(posteriors$posterior_new, FUN=mean)
-      se_mean_old <<- sapply(posteriors$posterior_old, FUN = sd) / sqrt(length(posteriors$posterior_old))
-      se_mean_new <<- sapply(posteriors$posterior_new, FUN = sd) / sqrt(length(posteriors$posterior_new))
-      frame2<-data.frame(size,value,mean_old,mean_new, se_mean_old, se_mean_new)
-      return(frame2)
-    }
-  )
-)
+library(tidyverse)
 ```
 
 ```{r}
@@ -97,6 +27,8 @@ frame<-my_instance$calculateMean()
 ggplot(frame, aes(x = size, y = value)) +
   geom_point(shape = 16, color = "blue") +
   labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
+
+my_instance$PlotCI()
 ```
 
 ```{r}
@@ -128,25 +60,8 @@ ggplot(frame0, aes(x = size, y = value)) +
 ```
 
 ```{r}
-#Delete the column "value"
-result_mean <- frame1[, -which(names(frame1) == "value")]
-names(result_mean)[1] <- "size"
-result_mean
-
-#reorganize into long format
-result_long1 <- gather(result_mean, key = "Variable", value = "Mean", mean_old, mean_new)
-
-ggplot(result_long1, aes(x = size, y = Mean, color = Variable)) +
-  geom_line() +
-  labs(title = "Mean Comparison",
-       x = "Size",
-       y = "Mean") +
-  scale_color_manual(values = c("mean_old" = "blue", "mean_new" = "red"))
-```
-
-```{r}
 #using informative priors, subset size = 100
-my_instance <- MyClass$new(old_distinct,new_distinct,rows_per_subset = 500,
+my_instance <- MyClass$new(old_distinct,new_distinct,rows_per_subset = 100,
                            alpha_prior_old=2,
                            alpha_prior_new=2,
                            beta_prior_old=20,
@@ -164,91 +79,18 @@ ggplot(frame1, aes(x = size, y = value)) +
 #Mean_old & Mean_new Plot
 
 result_mean <- frame1[, -which(names(frame1) == "value")]
-names(result_mean)[1] <- "size"
-result_mean
 
 #reorganize into long format
-result_long1 <- gather(result_mean, key = "Variable", value = "Mean", mean_old, mean_new)
+result_long1 <- gather(result_mean, key = "Variable", value = "Mean", posterior_old_mean:posterior_new_mean)
 
 ggplot(result_long1, aes(x = size, y = Mean, color = Variable)) +
   geom_line() +
   labs(title = "Mean Comparison",
        x = "Size",
        y = "Mean") +
-  scale_color_manual(values = c("mean_old" = "blue", "mean_new" = "red"))
+  scale_color_manual(values = c("posterior_old_mean" = "blue", "posterior_new_mean" = "red"))
 ```
 
 ```{r}
-#Mean_old & 95% CI Plot
-quantile0.025 <- quantile(frame1$mean_old, 0.025)
-quantile0.975 <- quantile(frame1$mean_old, 0.975)
-
-confidence_data <- data.frame(
-  size = frame1$size,
-  quantile0.025 = quantile0.025,
-  mean_old = frame1$mean_old,
-  mean_new = frame1$mean_new,
-  quantile0.975 = quantile0.975,
-  se_mean_old = frame1$se_mean_old,
-  se_mean_new = frame1$se_mean_new
-)
-
-plot_mean_old <- ggplot(confidence_data, aes(x = size, y = mean_old)) +
-  geom_line(color = "blue") +
-  geom_ribbon(aes(ymin = quantile0.025, ymax = quantile0.975), fill = "blue", alpha = 0.2) +
-  labs(title = "Mean_old Comparison with Confidence Intervals",
-       x = "Sample Size",
-       y = "Mean_old")
-plot_mean_old
+my_instance$PlotCI()
 ```
-
-```{r}
-#Mean_new & 95% CI Plot
-quantile0.025_new <- quantile(frame1$mean_new, 0.025)
-quantile0.975_new <- quantile(frame5$mean_new, 0.975)
-
-confidence_data_new <- data.frame(
-  size = frame1$size,
-  quantile0.025_new = quantile0.025_new,
-  mean_old = frame1$mean_old,
-  mean_new = frame1$mean_new,
-  quantile0.975_new = quantile0.975_new,
-  se_mean_old = frame1$se_mean_old,
-  se_mean_new = frame1$se_mean_new
-)
-
-plot_mean_new <- ggplot(confidence_data_new, aes(x = size, y = mean_new)) +
-  geom_line(color = "red") +
-  geom_ribbon(aes(ymin = quantile0.025_new, ymax = quantile0.975_new), fill = "red", alpha = 0.2) +
-  labs(title = "Mean_new Comparison with Confidence Intervals",
-       x = "Sample Size",
-       y = "Mean_new")
-plot_mean_new
-```
-
-```{r}
-#Combined plot
-combined_data <- data.frame(
-  size = confidence_data$size,
-  mean_old = confidence_data$mean_old,
-  mean_new = confidence_data_new$mean_new,
-  quantile0.025_old = confidence_data$quantile0.025,
-  quantile0.975_old = confidence_data$quantile0.975,
-  quantile0.025_new = confidence_data_new$quantile0.025_new,
-  quantile0.975_new = confidence_data_new$quantile0.975_new
-)
-
-combined_plot <- ggplot(combined_data, aes(x = size)) +
-  geom_line(aes(y = mean_old), color = "blue", linetype = "solid") +
-  geom_line(aes(y = mean_new), color = "red", linetype = "solid") +
-  geom_ribbon(aes(ymin = quantile0.025_old, ymax = quantile0.975_old), fill = "blue", alpha = 0.35) +
-  geom_ribbon(aes(ymin = quantile0.025_new, ymax = quantile0.975_new), fill = "red", alpha = 0.2) +
-  labs(title = "Mean Comparison with Confidence Intervals",
-       x = "Sample Size",
-       y = "Mean") +
-  scale_color_manual(values = c("blue", "red"))
-
-print(combined_plot)
-```
-
-

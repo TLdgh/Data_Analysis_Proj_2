@@ -87,14 +87,67 @@ mimic3d<-read.csv("mimic3d.csv", header = TRUE)
 ```
 
 ```{r}
-#cleanning the data
-ab_data<-slice(ab_data, -which(ab_data$group=="control" & ab_data$landing_page=="new_page"))
-ab_data<-slice(ab_data, -which(ab_data$group=="treatment" & ab_data$landing_page=="old_page"))
-ab_data<-slice(ab_data, -c(1877)) #drop the duplicated row for the ID 773192
+cat("Each ID has an unique value: ", length(unique(ab_data$user_id))==nrow(ab_data))
 ```
 
 ```{r}
-cat("Each ID has an unique value: ", length(unique(ab_data$user_id))==nrow(ab_data))
+#cleanning the data
+old <- data %>% filter(landing_page == "old_page" & group == "control")
+new <- data %>% filter(landing_page == "new_page" & group == "treatment")
+old_distinct <- old %>% distinct(old$user_id, .keep_all = TRUE)
+new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
+```
+
+```{r}
+#using non-informative priors
+my_instance <- MyClass$new(old_distinct,new_distinct,rows_per_subset = 100,
+                           alpha_prior_old=1,
+                           alpha_prior_new=1,
+                           beta_prior_old=1,
+                           beta_prior_new=1)
+
+frame0<-my_instance$calculateMean()
+
+
+ggplot(frame0, aes(x = size, y = value)) +
+  geom_point(shape = 16, color = "blue") +
+  labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
+```
+
+```{r}
+#using informative priors, subset size = 100
+my_instance <- MyClass$new(old_distinct,new_distinct,rows_per_subset = 100,
+                           alpha_prior_old=2,
+                           alpha_prior_new=2,
+                           beta_prior_old=20,
+                           beta_prior_new=20)
+
+frame1<-my_instance$calculateMean()
+
+
+ggplot(frame1, aes(x = size, y = value)) +
+  geom_point(shape = 16, color = "blue") +
+  labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
+```
+
+```{r}
+#Mean_old & Mean_new Plot
+
+result_mean <- frame1[, -which(names(frame1) == "value")]
+
+#reorganize into long format
+result_long1 <- gather(result_mean, key = "Variable", value = "Mean", posterior_old_mean:posterior_new_mean)
+
+ggplot(result_long1, aes(x = size, y = Mean, color = Variable)) +
+  geom_line() +
+  labs(title = "Mean Comparison",
+       x = "Size",
+       y = "Mean") +
+  scale_color_manual(values = c("posterior_old_mean" = "blue", "posterior_new_mean" = "red"))
+```
+
+```{r}
+my_instance$PlotCI()
 ```
 
 # References
