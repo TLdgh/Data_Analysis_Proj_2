@@ -175,4 +175,15 @@ ggplot(result_long1, aes(x = size, y = Mean, color = Variable)) +
 my_instance$PlotCI()
 ```
 
+```{r}
+#Bayesian Regression Analysis
+train_data<-mimic3d[1:47180,]
+test_data<-mimic3d[47181:nrow(mimic3d),]
+
+RegressionTest<-BayesianRegression$new(train_data, c("LOSdays"), c("NumTransfers"), prior_sigma=c(8,10), prior_beta=list(m=c(0,0), V=matrix(c(10,3,4,6), nrow=2, byrow = TRUE)) )
+RegressionTest$PosteriorPlot()
+RegressionTest$PredictionPlot(test_data)
+```
+
+
 # References
