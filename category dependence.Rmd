@@ -30,19 +30,6 @@ cat("\n*Group by ethnicity")
 table(mimic3d$ethnicity)
 ```
 
-```{R}
-# Pick cate data and valued them
-cate_data <- mimic3d_clean %>% transmute(
-  LOSdays_Less2 = ifelse(LOSdays <= 2, 1, 0), 
-  gender = factor(gender, levels = c("F", "M"), labels = c(0, 1)), 
-  admit_type = factor(admit_type, levels = c("ELECTIVE","EMERGENCY","NEWBORN","URGENT"), labels = c(0,1,2,3)),
-  insurance = factor(insurance, levels = c("Government","Medicaid","Medicare","Private","Self Pay"), labels = c(0,1,2,3,4))
-  )
-cate_data <- cbind(cate_data, mimic3d_clean$ExpiredHospital, mimic3d_clean$LOSgroupNum)
-names <- c("LOSdays_Less2","gender","admit_type","insurance","ExpiredHospital","LOSgroupNum")
-colnames(cate_data) <- names
-View(cate_data)
-```
 
 ```{r}
 #create a list contain pairwise comparsion between cate variables and LOSdays_less2
@@ -77,6 +64,19 @@ chi_square_test <- function(df){
 chi_square_test(cate_data)
 ```
 
+```{R}
+# Transform categorical data
+cate_data <- mimic3d_clean %>% transmute(
+  LOSdays_Less2 = ifelse(LOSdays <= 2, 1, 0), 
+  gender = factor(gender, levels = c("F", "M"), labels = c(0, 1)), 
+  admit_type = factor(admit_type, levels = c("ELECTIVE","EMERGENCY","NEWBORN","URGENT"), labels = c(0,1,2,3)),
+  insurance = factor(insurance, levels = c("Government","Medicaid","Medicare","Private","Self Pay"), labels = c(0,1,2,3,4))
+  )
+cate_data <- cbind(cate_data, mimic3d_clean$ExpiredHospital, mimic3d_clean$LOSgroupNum)
+names <- c("LOSdays_Less2","gender","admit_type","insurance","ExpiredHospital","LOSgroupNum")
+colnames(cate_data) <- names
+```
+
 ```{r}
 library(methods)
 
@@ -85,7 +85,7 @@ CategoryDependence <- setRefClass(
   fields = list(
     df = "data.frame"
   ),
-  #create a list contain pairwise comparsion between cate variables and LOSdays_less2
+ # create a list contain pairwise comparsion between cate variables and LOSdays_less2
  # create df1 containing  column 1  and column 2, put df1 into first place in a list 
  # create df2 containing column 1 and column 3, put df2 into 2nd of the list, 
  # create df3 containing column 1 and 4, put df3 into 3rd of the list, 
@@ -115,12 +115,68 @@ CategoryDependence <- setRefClass(
     }
   )
 )
-
 # Create an instance of the reference class with the given data frame
 test_result <- CategoryDependence$new(df = cate_data)
 
 # Perform chi-square tests
 test_result$chi_square_test()
-
-
 ```
+
+# main
+
+```{R}
+# Transform categorical data
+cate_data <- mimic3d_clean %>% transmute(
+  LOSdays_Less2 = ifelse(LOSdays <= 2, 1, 0), 
+  gender = factor(gender, levels = c("F", "M"), labels = c(0, 1)), 
+  admit_type = factor(admit_type, levels = c("ELECTIVE","EMERGENCY","NEWBORN","URGENT"), labels = c(0,1,2,3)),
+  insurance = factor(insurance, levels = c("Government","Medicaid","Medicare","Private","Self Pay"), labels = c(0,1,2,3,4))
+  )
+cate_data <- cbind(cate_data, mimic3d_clean$ExpiredHospital, mimic3d_clean$LOSgroupNum)
+names <- c("LOSdays_Less2","gender","admit_type","insurance","ExpiredHospital","LOSgroupNum")
+colnames(cate_data) <- names
+
+CategoryTest <- CategoryDependence$new(df = cate_data)
+CaregoryTest$chi_square_test()
+```
+
+# codespace
+
+CategoryDependence <- setRefClass(
+  "CategoryDependence",
+  fields = list(
+    df = "data.frame",
+    p.value = "numeric"
+  ),
+  # create a list contain pairwise comparsion between cate variables and LOSdays_less2
+  # create df1 containing  column 1  and column 2, put df1 into first place in a list 
+  # create df2 containing column 1 and column 3, put df2 into 2nd of the list, 
+  # create df3 containing column 1 and 4, put df3 into 3rd of the list, 
+  # create df4 containing  column 1  and 5, put df4 into 4th in list, 
+  # create df5 containing column 1 and 6, put df5 into 5rd of the list.
+  methods = list(
+    initialize = function(df) {
+      .self$p.value <- .self$chi_square_test(df)
+    },
+    create_list = function() {
+      my_list <- list()
+      for (i in 2:ncol(df)) {
+        df_name <- colnames(df)[i]
+        new_df <- data.frame(df[, 1], df[, i])
+        my_list[[df_name]] <- new_df
+      }
+      return(my_list)
+    },
+    # Do chi square test through the list
+    p.value <- data.frame(),
+    chi_square_test = function() {
+      for (v in colnames(df)[2:length(colnames(df))]) {
+        my_df <- create_list()[[v]]
+        chi_square_table <- table(my_df)
+        chi_square_result <- chisq.test(chi_square_table)
+        p.value[which(colnames(df)==v)] <- chi_square_result$p.value
+        return(p.value)
+      }
+    }
+  )
+)

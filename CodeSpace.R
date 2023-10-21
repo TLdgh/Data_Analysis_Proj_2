@@ -2,7 +2,7 @@ CategoryDependence <- setRefClass(
   "CategoryDependence",
   fields = list(
     df = "data.frame",
-    pvalue = "numeric"
+    p_value = "list"
   ),
   # create a list contain pairwise comparsion between cate variables and LOSdays_less2
   # create df1 containing  column 1  and column 2, put df1 into first place in a list 
@@ -12,28 +12,31 @@ CategoryDependence <- setRefClass(
   # create df5 containing column 1 and 6, put df5 into 5rd of the list.
   methods = list(
     initialize = function(df) {
-      .self$p.value <- .self$chi_square_test(df)
+      .self$df <- df
+      .self$p_value <- .self$chi_square_test()
     },
     create_list = function() {
       my_list <- list()
       for (i in 2:ncol(df)) {
-        df_name <- colnames(df)[i]
-        new_df <- data.frame(df[, 1], df[, i])
+        df_name <- colnames(.self$df)[i]
+        new_df <- data.frame(.self$df[[1]], 
+                             .self$df[[i]])
         my_list[[df_name]] <- new_df
       }
       return(my_list)
     },
     # Do chi square test through the list
-    p.value <- data.frame(),
     chi_square_test = function() {
-      for (v in colnames(df)[2:length(colnames(df))]) {
-        my_df <- create_list()[[v]]
+      p_value <- list()
+      for (i in 2:ncol(.self$df)) {
+        v <- colnames(.self$df)[i]
+        my_df <- .self$create_list()[[v]]
         chi_square_table <- table(my_df)
         chi_square_result <- chisq.test(chi_square_table)
         # Perform pvalue into df
-        p.value[which(colnames(df)==v)] <- chi_square_result$p.value
-        return(p.value)
+        p_value[[v]] <- chi_square_result$p.value
       }
+      return(p_value)
     }
   )
 )
