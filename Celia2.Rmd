@@ -1,12 +1,26 @@
 ---
 title: "Untitled"
-author: "Yang Lyu"
-date: "11/10/2023"
-output: pdf_document
+author: 
+  - Teng Li(7373086)
+  - Shiya Gao(300381032) 
+  - Chuhan Yue(300376046)
+  - Yang Lyu(8701121)
+output: 
+  pdf_document: 
+    keep_tex: true
+    includes:
+      in_header: columns.tex
+fontsize: 11pt
+header-includes: 
+  - \renewcommand{\and}{\\}
+  - \usepackage{float}
+  - \floatplacement{figure}{H}
+bibliography: References.bib
+link-citations: yes
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
 library(plotly)
 library(tidyverse)
 ```
