@@ -27,6 +27,7 @@ library(tidyverse)
 library(kableExtra)
 library(htmlwidgets)
 library(webshot)
+library(gridExtra)
 source("CodeSpace.R")
 source("TestSpace.R")
 ```
