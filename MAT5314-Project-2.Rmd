@@ -89,6 +89,34 @@ Var(p|\vec{x})=\frac{(\alpha+\sum_{i=1}^n x_i)(\beta+n-\sum_{i=1}^n x_i)}{(\alph
 One can see that asymptotically when we have a large sample size n, the mean of the posterior distribution approaches to the maximum likelihood estimator $\hat{p} =\frac{1}{n}\sum_{i=1}^n x_i$. Thus the specification of a prior is less important if the sample size is large. This allows us to make a subjective assumption of the success rate based on a probability distribution instead of viewing it as a fixed but unknown number in the frequentist hypothesis test. In the case where $\alpha=\beta=1$, we obtain the non-informative prior $Beta(1,1)$, which is $Uniform([0,1])$ distribution. It's called non-informative because we assume that all p are equally probable. In other words, we no longer put a subjective assumption on $p$.
 
 # Method
+```{r}
+# Part 1
+ab_data<-read.csv("ab_data.csv", header = TRUE)
+
+#cleanning the data
+old <- ab_data %>% filter(landing_page == "old_page" & group == "control")
+new <- ab_data %>% filter(landing_page == "new_page" & group == "treatment")
+old_distinct <- old %>% distinct(old$user_id, .keep_all = TRUE)
+new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
+
+# Part 2
+mimic3d<-read.csv("mimic3d.csv", header = TRUE)%>%select(-c("insurance", "religion", "marital_status"))%>%na.omit()
+train_data<-mimic3d[1:47180,]
+test_data<-mimic3d[47181:nrow(mimic3d),]
+```
+
+More specifically, based on the case of conversion rates of old and new pages, we show the derivation process from prior to posterior. From a business perspective, we want the conversion rate to be as high as possible. The goal of the experiment is to compare the advantages of the old and new pages in inducing visitor conversions. Imagine that as an individual web browser, conversions can only be yes or no. Each visitor obeys Bernoulli distribution. After removing repeated visits, the multiple independent Bernoulli distribution can be converted into a binomial distribution problem.  
+Next we want to talk about the choice of prior distribution. In order to compare the old and new pages, we need to model the conversion rates of the old and new pages. Since the conversion rate is in $[0,1]$, we can choose the Beta distribution as the prior.  
+
+Three reasons to choose Beta distribution:  
+1. We observed that Beta distribution is located between 0 and 1. We think of the horizontal axis of the curve as the value of the probability of a transition occurring in a trial, and the vertical axis as the probability that that value will occur. This just fits our experimental design.  
+
+2. The Beta distribution can take on various shapes by changing its parameters.  
+
+3. When the likelihood obeys the binomial distribution and the prior obeys the Beta distribution, the posterior distribution is also a Beta distribution, which means that the prior and posterior are conjugate distributions and are easy to calculate. The advantage is that as the appearance of newly added samples, we can quickly derive the posterior distribution. This will be reflected in the third part.  
+
+As mentioned above, when the prior is the beta distribution and the likelihood is the binomial distribution, the posterior is also the Beta distribution, and has the advantage of convenient and fast calculation. The following fragment will provide a derivation process for this situation, aiming to reveal the relationship between the parameters of the posterior distribution and the parameters of the prior.  
+
 Proof of parameters in posterior:  
 Let $p$ be the conversion rate, consider a series of Bernoulli distribution (every visitor has probability $p$ to convert or $(1-p)$ to not convert), $i.e.$  $binomial(s,n|p)=\binom{n}{s}p^{s}(1-p)^{n-s}$, where $p\in[0,1]$.  
 $$Prior=\mathbb{P}(p)=Beta(\alpha,\beta), likelihood=\mathbb{P}(s|p)=\binom{n}{s}p^{s}(1-p)^{n-s}$$.  
@@ -110,21 +138,70 @@ Hence, $\mathbb{P}(p|s)=\frac{\mathbb{P}(s|p) \cdot \mathbb{P}(p)}{\mathbb{P}(s)
 &=Beta(\alpha+s,\beta+n-s)
 \end{align*}
 
-```{r}
-# Part 1
-ab_data<-read.csv("ab_data.csv", header = TRUE)
+From the above proof process, we conclude that if the prior distribution is $Beta(\alpha,\beta)$, the likelihood obeys the binomial distribution, then the posterior is $Beta(\alpha+s,\beta+n-s)$, where $n$ is the sample size, $s$ is the summation of converted. With this, we can form the model.
 
-#cleanning the data
-old <- ab_data %>% filter(landing_page == "old_page" & group == "control")
-new <- ab_data %>% filter(landing_page == "new_page" & group == "treatment")
+By tryinga prior of $Beta(2,20)$ in a Bayesian AB test, we get the distribution of conversion rates of new and old pages respectively, we approach the following conclusion.
+```{r}
 old_distinct <- old %>% distinct(old$user_id, .keep_all = TRUE)
 new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
+visitor_to_old <- nrow(old_distinct)
+visitor_to_new <- nrow(new_distinct)
+conversion_old <- sum(old_distinct$converted)
+conversion_new <- sum(new_distinct$converted)
 
-# Part 2
-mimic3d<-read.csv("mimic3d.csv", header = TRUE)%>%select(-c("insurance", "religion", "marital_status"))%>%na.omit()
-train_data<-mimic3d[1:47180,]
-test_data<-mimic3d[47181:nrow(mimic3d),]
+alpha_prior <- 2
+beta_prior <- 20
+
+# calculate posterior
+posterior_old <- rbeta(1000000, alpha_prior+conversion_old, beta_prior+visitor_to_old-conversion_old)
+posterior_new <- rbeta(1000000, alpha_prior+conversion_new, beta_prior+visitor_to_new-conversion_new)
+
+# calculate prob of new rate > old rate
+cat("The probability of new page is better than the old page is",mean(posterior_new > posterior_old),"\n")
+
+#Riemann sum as safety check:
+sapply(seq(0.001,0.999, length.out=1000000), function(x){
+    dbeta(x, alpha_prior+conversion_new,beta_prior+visitor_to_new-conversion_new)*
+      pbeta(x, alpha_prior+conversion_old, beta_prior+visitor_to_old-conversion_old)})%>%sum()/1000000
+
 ```
+
+At the same time, we calculate the expected values of the conversion rates of the old and new pages respectively as follows.
+```{r}
+posterior_Old <- data.frame(old_rate=c(posterior_old))
+posterior_New <- data.frame(new_rate=c(posterior_new))
+mean_old <- mean(posterior_Old$old_rate)
+mean_new <- mean(posterior_New$new_rate)
+cat("Mean of conversion rate on old page is", mean_old, "\n")
+cat("Mean of conversion rate on new page is", mean_new, "\n")
+```
+
+In order to compare the conversion rates of the old and new pages more intuitively, we draw the obtained conversion rate distribution of the old and new pages in an individual graph.
+
+```{r}
+# plot density 
+fig_2 <- ggplot() +
+  geom_density(aes(x = posterior_Old$old_rate), fill = "blue", alpha = 0.5) +
+  geom_density(aes(x = posterior_New$new_rate), fill = "red", alpha = 0.5) +
+  geom_vline(xintercept = mean_old, linetype = "dashed", color = "blue") +
+  geom_vline(xintercept = mean_new, linetype = "dashed", color = "red") +
+  labs(title = "Probability Density Comparison", subtitle = "New page vs. old page",
+       x = "Conversion rate",
+       y = "Density") +
+  annotate("text", x = 0.1187, y = 300, label= "New Page") +
+  annotate("text", x = 0.1205, y = 300, label= "Old Page") +
+  annotate("text", x = mean_old, y = 0, label = paste("mean of old\n", round(mean_old, 6)), vjust = 0.5, size = 3) +
+  annotate("text", x = mean_new, y = 0, label = paste("mean of new\n", round(mean_new, 6)), vjust = 0.5, size = 3) +
+  annotate("segment", x = mean_old, xend = mean_new, y = 510, yend = 510, colour = "black", linewidth = 1, arrow = arrow()) +
+  annotate("text", x = (mean_old + mean_new)/2, y = 480, label = paste(round(mean_old-mean_new,6))) +
+  scale_color_manual(values = c("red", "blue"), labels = c("new page", "old page"))
+
+fig_2
+```
+
+The figure also shows the density function of the conversion rate of the new and old pages. We can see that compared to the old page, the probability density of the new page is shifted to the left. This implies that from an overall level, the performance of the new page is likely to be inferior to that of the old page. Furthermore, the expected conversion rate for the new page is `r mean_new`. However, the expected conversion rate for the old page is `r mean_old`. The conversion rate expectation for the new page is `r round(mean_old-mean_new,6)` lower than the conversion rate expectation for the old page.  
+
+In terms of conversion rate performance, since the probability that the new page is better than the old page is only about `r mean(posterior_new > posterior_old)`. At the same time, the graphed information shows that the conversion rate expectation of the new page is actually lower than that of the old page. There is no significant evidence that changing to a new page will increase visitor conversion rates.
 
 ```{r}
 #using non-informative priors
