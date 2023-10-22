@@ -27,6 +27,7 @@ library(tidyverse)
 library(kableExtra)
 library(htmlwidgets)
 library(webshot)
+library(dplyr)
 #library(gridExtra)
 ```
 
@@ -88,6 +89,27 @@ Var(p|\vec{x})=\frac{(\alpha+\sum_{i=1}^n x_i)(\beta+n-\sum_{i=1}^n x_i)}{(\alph
 One can see that asymptotically when we have a large sample size n, the mean of the posterior distribution approaches to the maximum likelihood estimator $\hat{p} =\frac{1}{n}\sum_{i=1}^n x_i$. Thus the specification of a prior is less important if the sample size is large. This allows us to make a subjective assumption of the success rate based on a probability distribution instead of viewing it as a fixed but unknown number in the frequentist hypothesis test. In the case where $\alpha=\beta=1$, we obtain the non-informative prior $Beta(1,1)$, which is $Uniform([0,1])$ distribution. It's called non-informative because we assume that all p are equally probable. In other words, we no longer put a subjective assumption on $p$.
 
 # Method
+Proof of parameters in posterior:  
+Let $p$ be the conversion rate, consider a series of Bernoulli distribution (every visitor has probability $p$ to convert or $(1-p)$ to not convert), $i.e.$  $binomial(s,n|p)=\binom{n}{s}p^{s}(1-p)^{n-s}$, where $p\in[0,1]$.  
+$$Prior=\mathbb{P}(p)=Beta(\alpha,\beta), likelihood=\mathbb{P}(s|p)=\binom{n}{s}p^{s}(1-p)^{n-s}$$.  
+By Bayesian: $\mathbb{P}(p|s)=\frac{\mathbb{P}(s|p) \cdot \mathbb{P}(p)}{\mathbb{P}(s)}$,  
+
+\begin{align*}
+\mathbb{P}(s) &= \int \mathbb{P}(s|p) \cdot \mathbb{P}(p)dp \\  
+&=\int_{0}^{1}\binom{n}{s}p^{s}(1-p)^{n-s}\frac{1}{B(\alpha,\beta)}p^{\alpha-1}(1-p)^{\beta-1}dp\\
+&=\frac{\binom{n}{s}}{B(\alpha,\beta)}\int_{0}^{1}p^{s+\alpha-1}(1-p)^{n-s+\beta-1}dp\\
+&=\binom{n}{s}\frac{B(s+\alpha,n+\beta-s)}{B(\alpha,\beta)}\int_{0}^{1}\underbrace{\frac{1}{B(s+\alpha,n+\beta-s)}p^{s+\alpha-1}(1-p)^{n+\beta-s-1}}_{this\ is \ a \ Beta \ with \ parameters\  s+\alpha,n+\beta-s}dp\\
+&=\binom{n}{s}\frac{B(\alpha+s,\beta+n-s)}{B(\alpha,\beta)} \underbrace{\int_{0}^{1}Beta(\alpha+s,\beta+n-s)dp}_{equals\ 1\ since\ integral\ on\ [0,1]\ is\ 1\ for\ Beta}\\
+&=\binom{n}{s}\frac{B(\alpha+s,\beta+n-s)}{B(\alpha,\beta)} 
+\end{align*}
+
+Hence, $\mathbb{P}(p|s)=\frac{\mathbb{P}(s|p) \cdot \mathbb{P}(p)}{\mathbb{P}(s)}$  
+\begin{align*}
+&=\frac{\binom{n}{s}p^{s}(1-p)^{n-s}\frac{1}{B(\alpha,\beta)}p^{\alpha-1}(1-p)^{\beta-1}}{\binom{n}{s}\frac{B(\alpha+s,\beta+n-s)}{B(\alpha,\beta)}}\\  
+&=\frac{1}{B(\alpha+s,\beta+n-s)}p^{\alpha+s-1}(1-p)^{\beta+n-s-1}\\
+&=Beta(\alpha+s,\beta+n-s)
+\end{align*}
+
 ```{r}
 # Part 1
 ab_data<-read.csv("ab_data.csv", header = TRUE)
@@ -153,19 +175,9 @@ ggplot(result_long1, aes(x = size, y = Mean, color = Variable)) +
 # Plot Credible Interval
 my_instance$PlotCI()%>%print()
 ```
-
-```{r}
-#Bayesian Regression Analysis
-RegressionTest<-BayesianRegression$new(train_data, c("LOSdays"), c("NumTransfers"), prior_sigma=c(8,10), prior_beta=list(m=c(0,0), V=matrix(c(10,3,4,6), nrow=2, byrow = TRUE)) )
-RegressionTest$PosteriorPlot()%>%print()
-PredictP<-RegressionTest$PredictionPlot(test_data)
-
-saveWidget(widget = PredictP, file = "./Figures/PredictP.html")
-shots<-webshot(url = "./Figures/PredictP.html", file = "./Figures/PredictP.png", delay = 1, zoom = 2, vheight = 400, vwidth = 500)
-```
-
 ```{R}
 # Transform categorical data
+mimic3d_clean <- na.omit(subset(read.csv("mimic3d.csv", header = TRUE),select = -marital_status))
 cate_data <- mimic3d_clean %>% transmute(
   LOSdays_Less2 = ifelse(LOSdays <= 2, 1, 0), 
   gender = factor(gender, levels = c("F", "M"), labels = c(0, 1)), 
@@ -178,6 +190,16 @@ colnames(cate_data) <- names
 # Chi_square_test on category variables
 CategoryTest <- CategoryDependence$new(cate_data)
 CategoryTest$chi_square_test()
+```
+
+```{r}
+#Bayesian Regression Analysis
+RegressionTest<-BayesianRegression$new(train_data, c("LOSdays"), c("NumTransfers"), prior_sigma=c(8,10), prior_beta=list(m=c(0,0), V=matrix(c(10,3,4,6), nrow=2, byrow = TRUE)) )
+RegressionTest$PosteriorPlot()%>%print()
+PredictP<-RegressionTest$PredictionPlot(test_data)
+
+saveWidget(widget = PredictP, file = "./Figures/PredictP.html")
+shots<-webshot(url = "./Figures/PredictP.html", file = "./Figures/PredictP.png", delay = 1, zoom = 2, vheight = 400, vwidth = 500)
 ```
 
 ```{r, echo=FALSE, fig.align='center', fig.cap = "Prediction Plot"}
