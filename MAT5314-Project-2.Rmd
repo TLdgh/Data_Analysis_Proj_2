@@ -19,6 +19,7 @@ header-includes:
 bibliography: References.bib
 link-citations: yes
 ---
+
 ```{r, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
 library(plotly)
@@ -26,7 +27,12 @@ library(tidyverse)
 library(kableExtra)
 library(htmlwidgets)
 library(webshot)
+#library(gridExtra)
+```
+
+```{r}
 source("CodeSpace.R")
+source("TestSpace.R")
 ```
 
 # Introduction
@@ -83,29 +89,79 @@ One can see that asymptotically when we have a large sample size n, the mean of 
 
 # Method
 ```{r}
+# Part 1
 ab_data<-read.csv("ab_data.csv", header = TRUE)
-mimic3d<-read.csv("mimic3d.csv", header = TRUE)%>%select(-c("insurance", "religion", "marital_status"))%>%na.omit()
-```
 
-```{r}
 #cleanning the data
-ab_data<-slice(ab_data, -which(ab_data$group=="control" & ab_data$landing_page=="new_page"))
-ab_data<-slice(ab_data, -which(ab_data$group=="treatment" & ab_data$landing_page=="old_page"))
-ab_data<-slice(ab_data, -c(1877)) #drop the duplicated row for the ID 773192
+old <- ab_data %>% filter(landing_page == "old_page" & group == "control")
+new <- ab_data %>% filter(landing_page == "new_page" & group == "treatment")
+old_distinct <- old %>% distinct(old$user_id, .keep_all = TRUE)
+new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
+
+# Part 2
+mimic3d<-read.csv("mimic3d.csv", header = TRUE)%>%select(-c("insurance", "religion", "marital_status"))%>%na.omit()
+train_data<-mimic3d[1:47180,]
+test_data<-mimic3d[47181:nrow(mimic3d),]
 ```
 
 ```{r}
-cat("Each ID has an unique value: ", length(unique(ab_data$user_id))==nrow(ab_data))
+#using non-informative priors
+my_instance <- BayesianSample$new(old_distinct,new_distinct,rows_per_subset = 1000,
+                           alpha_prior_old=1,
+                           alpha_prior_new=1,
+                           beta_prior_old=1,
+                           beta_prior_new=1)
+
+frame0<-my_instance$calculateMean()
+ggplot(frame0, aes(x = size, y = value)) +
+  geom_point(shape = 16, color = "blue") +
+  labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
+
+#using informative priors, subset size = 100
+my_instance <- BayesianSample$new(old_distinct,new_distinct,rows_per_subset = 1000,
+                           alpha_prior_old=2,
+                           alpha_prior_new=2,
+                           beta_prior_old=20,
+                           beta_prior_new=20)
+
+frame1<-my_instance$calculateMean()
+ggplot(frame1, aes(x = size, y = value)) +
+  geom_point(shape = 16, color = "blue") +
+  labs(title = "Scatter Plot Example", x = "X-axis Label", y = "Y-axis Label")
+
+#combine the two plots
+#combined_plot <- grid.arrange(plot0, plot1, ncol = 2)
+#print(combined_plot)
+```
+
+```{r}
+#Mean_old & Mean_new Plot
+result_mean <- frame1[, -which(names(frame1) == "value")]
+
+#reorganize into long format
+result_long1 <- gather(result_mean, key = "Variable", value = "Mean", posterior_old_mean:posterior_new_mean)
+
+ggplot(result_long1, aes(x = size, y = Mean, color = Variable)) +
+  geom_line() +
+  labs(title = "Mean Comparison",
+       x = "Size",
+       y = "Mean") +
+  scale_color_manual(values = c("posterior_old_mean" = "blue", "posterior_new_mean" = "red"))
+```
+
+```{r}
+# Plot Credible Interval
+my_instance$PlotCI()%>%print()
 ```
 
 ```{r}
 #Bayesian Regression Analysis
-train_data<-mimic3d[1:47180,]
-test_data<-mimic3d[47181:nrow(mimic3d),]
-
 RegressionTest<-BayesianRegression$new(train_data, c("LOSdays"), c("NumTransfers"), prior_sigma=c(8,10), prior_beta=list(m=c(0,0), V=matrix(c(10,3,4,6), nrow=2, byrow = TRUE)) )
-RegressionTest$PosteriorPlot()
-RegressionTest$PredictionPlot(test_data)
+RegressionTest$PosteriorPlot()%>%print()
+PredictP<-RegressionTest$PredictionPlot(test_data)
+
+saveWidget(widget = PredictP, file = "./Figures/PredictP.html")
+shots<-webshot(url = "./Figures/PredictP.html", file = "./Figures/PredictP.png", delay = 1, zoom = 2, vheight = 400, vwidth = 500)
 ```
 
 ```{R}
@@ -122,6 +178,10 @@ colnames(cate_data) <- names
 # Chi_square_test on category variables
 CategoryTest <- CategoryDependence$new(cate_data)
 CategoryTest$chi_square_test()
+```
+
+```{r, echo=FALSE, fig.align='center', fig.cap = "Prediction Plot"}
+knitr::include_graphics("./Figures/PredictP.png")
 ```
 
 

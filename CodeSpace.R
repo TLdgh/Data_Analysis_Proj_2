@@ -1,3 +1,4 @@
+
 CategoryDependence <- setRefClass(
   "CategoryDependence",
   fields = list(
@@ -27,14 +28,14 @@ CategoryDependence <- setRefClass(
     },
     # Do chi square test through the list
     chi_square_test = function() {
-      p_value <- list()
+      p_value <<- list()
       for (i in 2:ncol(.self$df)) {
         v <- colnames(.self$df)[i]
         my_df <- .self$create_list()[[v]]
         chi_square_table <- table(my_df)
         chi_square_result <- chisq.test(chi_square_table)
         # Perform pvalue into df
-        p_value[[v]] <- chi_square_result$p.value
+        p_value[[v]] <<- chi_square_result$p.value
       }
       return(p_value)
     }
@@ -102,14 +103,14 @@ BayesianRegression<-setRefClass(
       df_vline<-distinct(posteriorSample, labels, params_est)
       
       p<-posteriorSample%>%ggplot(aes(x=value)) +
-        geom_histogram(aes(y=..density..), bins = 50, fill="skyblue", color="black") +
+        geom_histogram(aes(y=after_stat(density)), bins = 50, fill="skyblue", color="black") +
         geom_density(colour='blue', linewidth = 0.5) +
         geom_vline(data=df_vline, aes(xintercept = params_est), linetype = 'dashed', size = 1)+
         geom_text(data=df_vline, aes(x= params_est, label = paste("Param_Est:", round(params_est,4)), y=Inf),size = 2,hjust=0, vjust=2) + 
         facet_wrap(~labels, scales = 'free',labeller = label_parsed) + theme_bw() +
         labs(x = 'Parameters', y = 'Density',title = 'Posterior Density')
       
-      print(p)
+      return(p)
     },
     
     PredictionPlot=function(test_data){
@@ -132,7 +133,8 @@ BayesianRegression<-setRefClass(
           yaxis = list(title = "Frequency"),
           bargap = 0.5
         )
-      print(p)
+      return(p)
     }
   )
 )
+
