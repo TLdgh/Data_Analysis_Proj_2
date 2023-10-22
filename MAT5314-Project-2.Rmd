@@ -120,8 +120,8 @@ cate_data <- cbind(cate_data, mimic3d_clean$ExpiredHospital, mimic3d_clean$LOSgr
 names <- c("LOSdays_Less2","gender","admit_type","insurance","ExpiredHospital","LOSgroupNum")
 colnames(cate_data) <- names
 # Chi_square_test on category variables
-CategoryTest <- CategoryDependence$new(df = cate_data)
-CaregoryTest$chi_square_test()
+CategoryTest <- CategoryDependence$new(cate_data)
+CategoryTest$chi_square_test()
 ```
 
 
