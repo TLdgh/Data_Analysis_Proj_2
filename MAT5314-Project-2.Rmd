@@ -88,6 +88,10 @@ Var(p|\vec{x})=\frac{(\alpha+\sum_{i=1}^n x_i)(\beta+n-\sum_{i=1}^n x_i)}{(\alph
 One can see that asymptotically when we have a large sample size n, the mean of the posterior distribution approaches to the maximum likelihood estimator $\hat{p} =\frac{1}{n}\sum_{i=1}^n x_i$. Thus the specification of a prior is less important if the sample size is large. This allows us to make a subjective assumption of the success rate based on a probability distribution instead of viewing it as a fixed but unknown number in the frequentist hypothesis test. In the case where $\alpha=\beta=1$, we obtain the non-informative prior $Beta(1,1)$, which is $Uniform([0,1])$ distribution. It's called non-informative because we assume that all p are equally probable. In other words, we no longer put a subjective assumption on $p$.
 
 # Method
+
+As the marketing people wanted to discover whether the new web page had a higher conversion rate than the old one, we collected a data set which contained users' visits and conversion information of the old and new web pages. In this project, we did a Bayesian AB test. The posterior distributions of old web page and new web page are stored and updated by continuously increasing the number of samples to form a new subset, as a way to determine whether the conversion rate of the new version is significantly better than that of the old version in each subset.
+
+<<<First, we needed to preprocess the data. We found that 不是所有不同的user_id都只对应唯一一种landing status。“。。。代码”<<<
 ```{r}
 # Part 1
 ab_data<-read.csv("ab_data.csv", header = TRUE)
@@ -104,6 +108,14 @@ train_data<-mimic3d[1:47180,]
 test_data<-mimic3d[47181:nrow(mimic3d),]
 ```
 
+For the choice of the parameters of the prior distribution, we had two cases: one was to use a non-informative prior, i.e., to assume that $Beta(1, 1)$ was the prior distribution of the data of the old and new web pages; the other was to use an informative prior, i.e., to assume that $Beta(2, 20)$ was the prior distribution of the data of the old and new web pages. 
+
+We first took 100 samples to form the first subset and calculated the value (the proportion of posterior samples from the new page that were greater than the posterior samples from the old page), posterior_old_mean and posterior_new_mean (the mean of the posterior distribution for the old and new web pages), posterior_old_se and posterior_new_se (standard error of the posterior distributions). 
+Then, we took another 100 samples and add them to the first subset to form the second subset and computed the corresponding value, posterior_old_mean, posterior_new_mean, posterior_old_se and posterior_new_se. This was repeated until all the samples had been taken.
+
+In order to compare the effects of non-infromative priors and informative priors on the posterior results. We ploted the scatter plots of size and value in the non-infomative priors and informative priors conditions respectively. The comparison revealed that in this dataset, the effect of whether the prior was infomative or not on the value value was almost zero. 
+
+In addition, we could notice that as the sample size of subset increased, the value showed an overall decreasing trend, and finally almost fluctuated around 0.08. This illustrated that the new page was less effective relative to the old page and needed to be improved.
 ```{r}
 #using non-informative priors
 my_instance <- BayesianSample$new(old_distinct,new_distinct,rows_per_subset = 1000,
@@ -134,6 +146,7 @@ ggplot(frame1, aes(x = size, y = value)) +
 #print(combined_plot)
 ```
 
+Secondly, we plotted the image of the mean of posterior. The red line represented posterior_new_mean and the blue one represented posterior_old_mean. From the graph we noticed that when the sample size was in the range of around 200-12500, the value of posterior_new_mean was larger than the value of posterior_old_mean, i.e., new web page had higher conversion rates and the difference between the two conversion rates was quite large. However, when the sample size of the subset was larger than 12500, the blue line had been always higher than the red line, but the difference between the two was relatively small. From this, we could infer that overall, the conversion rate of the new web pages was lower than that of the old web page. This result was the opposite of what marketing people expected.
 ```{r}
 #Mean_old & Mean_new Plot
 result_mean <- frame1[, -which(names(frame1) == "value")]
@@ -149,6 +162,7 @@ ggplot(result_long1, aes(x = size, y = Mean, color = Variable)) +
   scale_color_manual(values = c("posterior_old_mean" = "blue", "posterior_new_mean" = "red"))
 ```
 
+Finally, we ploted the 95% confidence intervals for each subset of posterior_new_mean and posterior_old_mean. As the sample size of the subset increased, the range of the confidence intervals (the range of the light blue area on the graph) becomed gradually narrower, indicating that: the larger the sample size of the subset, the smaller the error caused by sampling, the closer the posterior_new_mean and posterior_old_mean were to the true value, and the results were more reliable.
 ```{r}
 # Plot Credible Interval
 my_instance$PlotCI()%>%print()
