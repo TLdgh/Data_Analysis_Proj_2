@@ -1,3 +1,88 @@
+BayesianSample <- setRefClass(
+  "BayesianSample",
+  fields = list(old_distinct= "data.frame",new_distinct = "data.frame",rows_per_subset="numeric",
+                alpha_prior_old="numeric", alpha_prior_new="numeric", beta_prior_old="numeric", beta_prior_new="numeric",
+                value="numeric",size="numeric",posteriors="list",se_mean_old = "numeric",
+                se_mean_new = "numeric"),
+  methods = list(
+    initialize = function(old_distinct,new_distinct,alpha_prior_old,alpha_prior_new,beta_prior_old,beta_prior_new,rows_per_subset){
+      .self$alpha_prior_old<-alpha_prior_old
+      .self$alpha_prior_new<-alpha_prior_new
+      .self$beta_prior_old<-beta_prior_old
+      .self$beta_prior_new<-beta_prior_new
+      .self$value<-numeric(0)
+      .self$size<-numeric(0)
+      .self$se_mean_old <- numeric(0)  # 添加初始化值
+      .self$se_mean_new <- numeric(0)
+      .self$posteriors<-.self$GetPosteriors(old_distinct,new_distinct,rows_per_subset)
+      .self$se_mean_old <- se_mean_old
+      .self$se_mean_new <- se_mean_new
+    },
+    
+    #take the sample of the data
+    takeSample=function(old_distinct,new_distinct,rows_per_subset,i){
+      start_row <- (i - 1) * rows_per_subset + 1
+      end_row <- i * rows_per_subset
+      old_sample<-old_distinct[seq(from=start_row, to=end_row), ]
+      new_sample<-new_distinct[seq(from=start_row, to=end_row), ]
+      size<<-c(size, i*rows_per_subset)
+      return(list(old_sample=old_sample, new_sample=new_sample))
+    },
+    
+    #get the posteriors using subsets of data
+    GetPosteriors=function(old_distinct,new_distinct,rows_per_subset){
+      posterior_old<-list()
+      posterior_new<-list()
+      
+      #loop through the subsets defined by rows_per_subset
+      for(i in 1:floor(min(nrow(old_distinct), nrow(new_distinct))/rows_per_subset) ){
+        samples<-.self$takeSample(old_distinct,new_distinct,rows_per_subset,i)
+        visitor_to_old <- nrow(samples$old_sample)
+        visitor_to_new <- nrow(samples$new_sample)
+        conversion_old <- sum(samples$old_sample$converted)
+        conversion_new <- sum(samples$new_sample$converted)
+        posterior_old[[i]] <- rbeta(100000,alpha_prior_old+conversion_old,beta_prior_old+visitor_to_old-conversion_old)
+        posterior_new[[i]] <- rbeta(100000,alpha_prior_new+conversion_new,beta_prior_new+visitor_to_new-conversion_new)
+        value<<-c(value, mapply(function(x, y) {x>y}, posterior_new[[i]], posterior_old[[i]])%>%mean())
+        
+        alpha_prior_old<<-alpha_prior_old+conversion_old
+        alpha_prior_new<<-alpha_prior_new+conversion_new
+        beta_prior_old<<-beta_prior_old+visitor_to_old-conversion_old
+        beta_prior_new<<-beta_prior_new+visitor_to_new-conversion_new
+      }
+      return(list(posterior_old=posterior_old,posterior_new=posterior_new))
+    },
+    
+    #calculate the posterior mean
+    calculateMean=function(){
+      posterior_mean<-map(posteriors, function(x){sapply(x, FUN=mean)})
+      posterior_se<-map(posteriors, function(x){sapply(x, function(x){sd(x)/sqrt(length(x))})})
+      
+      frame<-data.frame(size,value,posterior_mean%>%as.data.frame(col.names=paste0(names(posterior_mean), "_mean")),
+                        posterior_se%>%as.data.frame(col.names=paste0(names(posterior_mean), "_se")))
+      return(frame)
+    },
+    
+    PlotCI=function(){
+      posterior_mean<-map(posteriors, function(x){sapply(x, FUN=mean)})
+      names(posterior_mean)<-paste0(names(posterior_mean), ".mean")
+      
+      posteriorCI<-map(posteriors, function(x) do.call(rbind, lapply(x, function(y){data.frame(Q25=quantile(y, 0.025), Q975=quantile(y,0.975))})))
+      
+      frame<-cbind(data.frame(size),posterior_mean%>%as.data.frame(), posteriorCI%>%as.data.frame())%>%
+        pivot_longer(cols=starts_with(c("posterior_old", "posterior_new")), names_to=c("Type",".value"), names_sep = "\\.")
+      
+      p<-ggplot(frame, aes(x = size, y = mean)) +
+        geom_line(color = "blue") +
+        geom_ribbon(aes(ymin = Q25,  ymax = Q975), fill = "blue", alpha = 0.2) +
+        facet_wrap(~Type,scales = 'free',labeller = label_parsed) + theme_bw() +
+        labs(title = "Mean Comparison with Confidence Intervals",
+             x = "Sample Size",
+             y = "Mean")
+      return(p)
+    }
+  )
+)
 
 CategoryDependence <- setRefClass(
   "CategoryDependence",
