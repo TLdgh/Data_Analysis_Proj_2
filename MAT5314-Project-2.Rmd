@@ -91,7 +91,22 @@ One can see that asymptotically when we have a large sample size n, the mean of 
 
 As the marketing people wanted to discover whether the new web page had a higher conversion rate than the old one, we collected a data set which contained users' visits and conversion information of the old and new web pages. In this project, we did a Bayesian AB test. The posterior distributions of old web page and new web page are stored and updated by continuously increasing the number of samples to form a new subset, as a way to determine whether the conversion rate of the new version is significantly better than that of the old version in each subset.
 
-<<<First, we needed to preprocess the data. We found that 不是所有不同的user_id都只对应唯一一种landing status。“。。。代码”<<<
+Before we did the Bayesian AB test, we noticed that there was some repetitive data like all the columns details are the same except the "timestamp" and some data error like "new-page" was in the "control" group, "old-page" was in the "treatment" group. So we pre-processed the data to solve these problems.
+```{r}
+ab_data<-read.csv("ab_data.csv", header = TRUE)
+
+duplicates <- ab_data %>%
+  group_by(user_id, group, landing_page, converted) %>%
+  filter(n() > 1)
+head(duplicates)
+
+filtered_data <- ab_data %>%
+  filter((group == "control" & landing_page == "new_page") |
+         (group == "treatment" & landing_page == "old_page"))
+
+head(filtered_data, 4)
+```
+
 ```{r}
 # Part 1
 ab_data<-read.csv("ab_data.csv", header = TRUE)
@@ -110,7 +125,7 @@ test_data<-mimic3d[47181:nrow(mimic3d),]
 
 For the choice of the parameters of the prior distribution, we had two cases: one was to use a non-informative prior, i.e., to assume that $Beta(1, 1)$ was the prior distribution of the data of the old and new web pages; the other was to use an informative prior, i.e., to assume that $Beta(2, 20)$ was the prior distribution of the data of the old and new web pages. 
 
-We first took 100 samples to form the first subset and calculated the value (the proportion of posterior samples from the new page that were greater than the posterior samples from the old page), posterior_old_mean and posterior_new_mean (the mean of the posterior distribution for the old and new web pages), posterior_old_se and posterior_new_se (standard error of the posterior distributions). 
+We first took 100 samples to form the first subset and calculated the value (Mean of the proportion of new page's posterior distributions greater than old page's posterior distributions), posterior_old_mean and posterior_new_mean (the mean of the posterior distribution for the old and new web pages), posterior_old_se and posterior_new_se (standard error of the posterior distributions). 
 Then, we took another 100 samples and add them to the first subset to form the second subset and computed the corresponding value, posterior_old_mean, posterior_new_mean, posterior_old_se and posterior_new_se. This was repeated until all the samples had been taken.
 
 In order to compare the effects of non-infromative priors and informative priors on the posterior results. We ploted the scatter plots of size and value in the non-infomative priors and informative priors conditions respectively. The comparison revealed that in this dataset, the effect of whether the prior was infomative or not on the value value was almost zero. 
