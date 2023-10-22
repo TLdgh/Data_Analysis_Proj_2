@@ -108,14 +108,15 @@ test_data<-mimic3d[47181:nrow(mimic3d),]
 More specifically, based on the case of conversion rates of old and new pages, we show the derivation process from prior to posterior. From a business perspective, we want the conversion rate to be as high as possible. The goal of the experiment is to compare the advantages of the old and new pages in inducing visitor conversions. Imagine that as an individual web browser, conversions can only be yes or no. Each visitor obeys Bernoulli distribution. After removing repeated visits, the multiple independent Bernoulli distribution can be converted into a binomial distribution problem.  
 Next we want to talk about the choice of prior distribution. In order to compare the old and new pages, we need to model the conversion rates of the old and new pages. Since the conversion rate is in $[0,1]$, we can choose the Beta distribution as the prior.  
 
-Three reasons to choose Beta distribution:  
+Three reasons to choose Beta distribution: 
+
 1. We observed that Beta distribution is located between 0 and 1. We think of the horizontal axis of the curve as the value of the probability of a transition occurring in a trial, and the vertical axis as the probability that that value will occur. This just fits our experimental design.  
 
 2. The Beta distribution can take on various shapes by changing its parameters.  
 
 3. When the likelihood obeys the binomial distribution and the prior obeys the Beta distribution, the posterior distribution is also a Beta distribution, which means that the prior and posterior are conjugate distributions and are easy to calculate. The advantage is that as the appearance of newly added samples, we can quickly derive the posterior distribution. This will be reflected in the third part.  
 
-As mentioned above, when the prior is the beta distribution and the likelihood is the binomial distribution, the posterior is also the Beta distribution, and has the advantage of convenient and fast calculation. The following fragment will provide a derivation process for this situation, aiming to reveal the relationship between the parameters of the posterior distribution and the parameters of the prior.  
+As mentioned above, when the prior is the Beta distribution and the likelihood is the binomial distribution, the posterior is also the Beta distribution, and has the advantage of convenient and fast calculation. The following fragment will provide a derivation process for this situation, aiming to reveal the relationship between the parameters of the posterior distribution and the parameters of the prior.  
 
 Proof of parameters in posterior:  
 Let $p$ be the conversion rate, consider a series of Bernoulli distribution (every visitor has probability $p$ to convert or $(1-p)$ to not convert), $i.e.$  $binomial(s,n|p)=\binom{n}{s}p^{s}(1-p)^{n-s}$, where $p\in[0,1]$.  
