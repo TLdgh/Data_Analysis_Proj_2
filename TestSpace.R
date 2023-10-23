@@ -19,7 +19,7 @@ tryCatch(
                                                       posterior_old_se=0.0002347, 
                                                       posterior_new_se= 0.0002376))
     cat("calculateMean from BayesianSample Class executed successfully.", "\n")
-    cat("Calculated params are expected", res, "\n")
+    cat("Calculated params are expected: ", res, "\n")
   },
   error= function(err){
     cat("Error in Function calculateMean from BayesianSample Class:", conditionMessage(err), "\n")
@@ -62,7 +62,7 @@ tryCatch(
     res<-all(RegressionTest$posteriorSample%>%group_by(param)%>%summarise(m=round(mean(value),7))%>%
                data.frame()%>%select(m) == data.frame(m=c(1.1260214, 0.7556874, 0.0614320)))
     cat("PosteriorSample from BayesianRegression Class executed successfully.", "\n")
-    cat("Calculated params are expected", res, "\n")
+    cat("Calculated params are expected: ", res, "\n")
   },
   error= function(err){
     cat("Error in Function PosteriorSample from BayesianRegression Class:", conditionMessage(err), "\n")
