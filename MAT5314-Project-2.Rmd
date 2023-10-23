@@ -27,7 +27,6 @@ library(tidyverse)
 library(kableExtra)
 library(htmlwidgets)
 library(webshot)
-library(dplyr)
 #library(gridExtra)
 ```
 
@@ -253,21 +252,24 @@ ggplot(result_long1, aes(x = size, y = Mean, color = Variable)) +
 # Plot Credible Interval
 my_instance$PlotCI()%>%print()
 ```
+
 ```{R}
 # Transform categorical data
 mimic3d_clean <- na.omit(subset(read.csv("mimic3d.csv", header = TRUE),select = -marital_status))
 cate_data <- mimic3d_clean %>% transmute(
-  LOSdays_Less2 = ifelse(LOSdays <= 2, 1, 0), 
-  gender = factor(gender, levels = c("F", "M"), labels = c(0, 1)), 
-  admit_type = factor(admit_type, levels = c("ELECTIVE","EMERGENCY","NEWBORN","URGENT"), labels = c(0,1,2,3)),
-  insurance = factor(insurance, levels = c("Government","Medicaid","Medicare","Private","Self Pay"), labels = c(0,1,2,3,4))
+  LOSdays_Less2 = factor(ifelse(LOSdays <= 2, 1, 0)), 
+  gender = factor(gender, levels = c("F", "M")), 
+  admit_type = factor(admit_type, levels = c("ELECTIVE","EMERGENCY","NEWBORN","URGENT")),
+  insurance = factor(insurance, levels = c("Government","Medicaid","Medicare","Private","Self Pay")),
+  ExpiredHospital=factor(ExpiredHospital),
+  LOSgroupNum=factor(LOSgroupNum)
   )
-cate_data <- cbind(cate_data, mimic3d_clean$ExpiredHospital, mimic3d_clean$LOSgroupNum)
-names <- c("LOSdays_Less2","gender","admit_type","insurance","ExpiredHospital","LOSgroupNum")
-colnames(cate_data) <- names
+
 # Chi_square_test on category variables
-CategoryTest <- CategoryDependence$new(cate_data)
-CategoryTest$chi_square_test()
+CategoryTest <- CategoryDependence$new(cate_data, 
+                                       predictor_x=c("gender","admit_type","insurance","ExpiredHospital","LOSgroupNum"),
+                                       response_y="LOSdays_Less2")
+CategoryTest$p_value
 ```
 
 ```{r}
