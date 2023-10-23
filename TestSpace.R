@@ -63,9 +63,13 @@ tryCatch(
                data.frame()%>%select(m) == data.frame(m=c(1.1260214, 0.7556874, 0.0614320)))
     cat("PosteriorSample from BayesianRegression Class executed successfully.", "\n")
     cat("Calculated params are expected: ", res, "\n")
+    
+    res<-RegressionTest$PredictiveCheck(train_data)
+    cat("PredictiveCheck from BayesianRegression Class executed successfully.", "\n")
+    cat("PredictiveCheck returned the expected value: ", res==61.51682, "\n")
   },
   error= function(err){
-    cat("Error in Function PosteriorSample from BayesianRegression Class:", conditionMessage(err), "\n")
+    cat("Error in either Function PosteriorSample or PredictiveCheck from BayesianRegression Class:", conditionMessage(err), "\n")
   }
 )
 
@@ -91,7 +95,8 @@ tryCatch(
   }
 )
 
-# TestCate
+
+# TestCase
 test_cat <- data.frame(
   resp = c(rep(0,178),rep(0, 138),rep(0,108),rep(1, 570),rep(1, 648),rep(1,442),rep(2, 138),rep(2, 252),rep(2, 252)),
   Var1 = c(rep(0,178),rep(1, 138),rep(2,108),rep(0, 570),rep(1, 648),rep(2,442),rep(0, 138),rep(1, 252),rep(2, 252)))%>% 
