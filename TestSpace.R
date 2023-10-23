@@ -66,7 +66,7 @@ tryCatch(
     
     res<-RegressionTest$PredictiveCheck(train_data)
     cat("PredictiveCheck from BayesianRegression Class executed successfully.", "\n")
-    cat("PredictiveCheck returned the expected value: ", res==61.51682, "\n")
+    cat("PredictiveCheck returned the expected value: ", round(res, 5)==61.51682, "\n")
   },
   error= function(err){
     cat("Error in either Function PosteriorSample or PredictiveCheck from BayesianRegression Class:", conditionMessage(err), "\n")
