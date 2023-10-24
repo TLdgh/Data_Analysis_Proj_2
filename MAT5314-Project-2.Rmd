@@ -88,6 +88,25 @@ Var(p|\vec{x})=\frac{(\alpha+\sum_{i=1}^n x_i)(\beta+n-\sum_{i=1}^n x_i)}{(\alph
 One can see that asymptotically when we have a large sample size n, the mean of the posterior distribution approaches to the maximum likelihood estimator $\hat{p} =\frac{1}{n}\sum_{i=1}^n x_i$. Thus the specification of a prior is less important if the sample size is large. This allows us to make a subjective assumption of the success rate based on a probability distribution instead of viewing it as a fixed but unknown number in the frequentist hypothesis test. In the case where $\alpha=\beta=1$, we obtain the non-informative prior $Beta(1,1)$, which is $Uniform([0,1])$ distribution. It's called non-informative because we assume that all p are equally probable. In other words, we no longer put a subjective assumption on $p$.
 
 # Method
+
+As the marketing people wanted to discover whether the new web page had a higher conversion rate than the old one, we collected a data set which contained users' visits and conversion information of the old and new web pages. In this project, we did a Bayesian AB test. The posterior distributions of old web page and new web page are stored and updated by continuously increasing the number of samples to form a new subset, as a way to determine whether the conversion rate of the new version is significantly better than that of the old version in each subset.
+
+Before we did the Bayesian AB test, we noticed that there was some repetitive data like all the columns details are the same except the "timestamp" and some data error like "new-page" was in the "control" group, "old-page" was in the "treatment" group. So we pre-processed the data to solve these problems.
+```{r}
+ab_data<-read.csv("ab_data.csv", header = TRUE)
+
+duplicates <- ab_data %>%
+  group_by(user_id, group, landing_page, converted) %>%
+  filter(n() > 1)
+head(duplicates)
+
+filtered_data <- ab_data %>%
+  filter((group == "control" & landing_page == "new_page") |
+         (group == "treatment" & landing_page == "old_page"))
+
+head(filtered_data, 4)
+```
+
 ```{r}
 # Part 1
 ab_data<-read.csv("ab_data.csv", header = TRUE)
@@ -99,7 +118,7 @@ old_distinct <- old %>% distinct(old$user_id, .keep_all = TRUE)
 new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
 
 # Part 2
-mimic3d<-read.csv("mimic3d.csv", header = TRUE)%>%select(-c("insurance", "religion", "marital_status"))%>%na.omit()
+mimic3d<-read.csv("mimic3d.csv", header = TRUE)%>%select(-c("gender","admit_location","AdmitDiagnosis","religion","marital_status","ethnicity","AdmitProcedure","LOSgroupNum"))%>%na.omit()
 train_data<-mimic3d[1:47180,]
 test_data<-mimic3d[47181:nrow(mimic3d),]
 ```
@@ -117,30 +136,17 @@ Three reasons to choose Beta distribution:
 
 As mentioned above, when the prior is the Beta distribution and the likelihood is the binomial distribution, the posterior is also the Beta distribution, and has the advantage of convenient and fast calculation. The following fragment will provide a derivation process for this situation, aiming to reveal the relationship between the parameters of the posterior distribution and the parameters of the prior.  
 
-Proof of parameters in posterior:  
-Let $p$ be the conversion rate, consider a series of Bernoulli distribution (every visitor has probability $p$ to convert or $(1-p)$ to not convert), $i.e.$  $binomial(s,n|p)=\binom{n}{s}p^{s}(1-p)^{n-s}$, where $p\in[0,1]$.  
-$$Prior=\mathbb{P}(p)=Beta(\alpha,\beta), likelihood=\mathbb{P}(s|p)=\binom{n}{s}p^{s}(1-p)^{n-s}$$.  
-By Bayesian: $\mathbb{P}(p|s)=\frac{\mathbb{P}(s|p) \cdot \mathbb{P}(p)}{\mathbb{P}(s)}$,  
-
-\begin{align*}
-\mathbb{P}(s) &= \int \mathbb{P}(s|p) \cdot \mathbb{P}(p)dp \\  
-&=\int_{0}^{1}\binom{n}{s}p^{s}(1-p)^{n-s}\frac{1}{B(\alpha,\beta)}p^{\alpha-1}(1-p)^{\beta-1}dp\\
-&=\frac{\binom{n}{s}}{B(\alpha,\beta)}\int_{0}^{1}p^{s+\alpha-1}(1-p)^{n-s+\beta-1}dp\\
-&=\binom{n}{s}\frac{B(s+\alpha,n+\beta-s)}{B(\alpha,\beta)}\int_{0}^{1}\underbrace{\frac{1}{B(s+\alpha,n+\beta-s)}p^{s+\alpha-1}(1-p)^{n+\beta-s-1}}_{this\ is \ a \ Beta \ with \ parameters\  s+\alpha,n+\beta-s}dp\\
-&=\binom{n}{s}\frac{B(\alpha+s,\beta+n-s)}{B(\alpha,\beta)} \underbrace{\int_{0}^{1}Beta(\alpha+s,\beta+n-s)dp}_{equals\ 1\ since\ integral\ on\ [0,1]\ is\ 1\ for\ Beta}\\
-&=\binom{n}{s}\frac{B(\alpha+s,\beta+n-s)}{B(\alpha,\beta)} 
-\end{align*}
-
-Hence, $\mathbb{P}(p|s)=\frac{\mathbb{P}(s|p) \cdot \mathbb{P}(p)}{\mathbb{P}(s)}$  
-\begin{align*}
-&=\frac{\binom{n}{s}p^{s}(1-p)^{n-s}\frac{1}{B(\alpha,\beta)}p^{\alpha-1}(1-p)^{\beta-1}}{\binom{n}{s}\frac{B(\alpha+s,\beta+n-s)}{B(\alpha,\beta)}}\\  
-&=\frac{1}{B(\alpha+s,\beta+n-s)}p^{\alpha+s-1}(1-p)^{\beta+n-s-1}\\
-&=Beta(\alpha+s,\beta+n-s)
-\end{align*}
-
 From the above proof process, we conclude that if the prior distribution is $Beta(\alpha,\beta)$, the likelihood obeys the binomial distribution, then the posterior is $Beta(\alpha+s,\beta+n-s)$, where $n$ is the sample size, $s$ is the summation of converted. With this, we can form the model.
 
 By tryinga prior of $Beta(2,20)$ in a Bayesian AB test, we get the distribution of conversion rates of new and old pages respectively, we approach the following conclusion.
+For the choice of the parameters of the prior distribution, we had two cases: one was to use a non-informative prior, i.e., to assume that $Beta(1, 1)$ was the prior distribution of the data of the old and new web pages; the other was to use an informative prior, i.e., to assume that $Beta(2, 20)$ was the prior distribution of the data of the old and new web pages. 
+
+We first took 100 samples to form the first subset and calculated the value (Mean of the proportion of new page's posterior distributions greater than old page's posterior distributions), posterior_old_mean and posterior_new_mean (the mean of the posterior distribution for the old and new web pages), posterior_old_se and posterior_new_se (standard error of the posterior distributions). 
+Then, we took another 100 samples and add them to the first subset to form the second subset and computed the corresponding value, posterior_old_mean, posterior_new_mean, posterior_old_se and posterior_new_se. This was repeated until all the samples had been taken.
+
+In order to compare the effects of non-infromative priors and informative priors on the posterior results. We ploted the scatter plots of size and value in the non-infomative priors and informative priors conditions respectively. The comparison revealed that in this dataset, the effect of whether the prior was infomative or not on the value value was almost zero. 
+
+In addition, we could notice that as the sample size of subset increased, the value showed an overall decreasing trend, and finally almost fluctuated around 0.08. This illustrated that the new page was less effective relative to the old page and needed to be improved.
 ```{r}
 old_distinct <- old %>% distinct(old$user_id, .keep_all = TRUE)
 new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
@@ -233,6 +239,7 @@ ggplot(frame1, aes(x = size, y = value)) +
 #print(combined_plot)
 ```
 
+Secondly, we plotted the image of the mean of posterior. The red line represented posterior_new_mean and the blue one represented posterior_old_mean. From the graph we noticed that when the sample size was in the range of around 200-12500, the value of posterior_new_mean was larger than the value of posterior_old_mean, i.e., new web page had higher conversion rates and the difference between the two conversion rates was quite large. However, when the sample size of the subset was larger than 12500, the blue line had been always higher than the red line, but the difference between the two was relatively small. From this, we could infer that overall, the conversion rate of the new web pages was lower than that of the old web page. This result was the opposite of what marketing people expected.
 ```{r}
 #Mean_old & Mean_new Plot
 result_mean <- frame1[, -which(names(frame1) == "value")]
@@ -248,6 +255,7 @@ ggplot(result_long1, aes(x = size, y = Mean, color = Variable)) +
   scale_color_manual(values = c("posterior_old_mean" = "blue", "posterior_new_mean" = "red"))
 ```
 
+Finally, we ploted the 95% confidence intervals for each subset of posterior_new_mean and posterior_old_mean. As the sample size of the subset increased, the range of the confidence intervals (the range of the light blue area on the graph) becomed gradually narrower, indicating that: the larger the sample size of the subset, the smaller the error caused by sampling, the closer the posterior_new_mean and posterior_old_mean were to the true value, and the results were more reliable.
 ```{r}
 # Plot Credible Interval
 my_instance$PlotCI()%>%print()
@@ -255,23 +263,35 @@ my_instance$PlotCI()%>%print()
 
 ```{R}
 # Transform categorical data
-mimic3d_clean <- na.omit(subset(read.csv("mimic3d.csv", header = TRUE),select = -marital_status))
+mimic3d_clean <- na.omit(subset(read.csv("mimic3d.csv", header = TRUE),select = c(LOSdays, gender, admit_type, insurance, ExpiredHospital)))
 cate_data <- mimic3d_clean %>% transmute(
-  LOSdays_Less2 = factor(ifelse(LOSdays <= 2, 1, 0)), 
+  LOSdays_Less2 = factor(ifelse(LOSdays < 2, 1, 0)), 
   gender = factor(gender, levels = c("F", "M")), 
   admit_type = factor(admit_type, levels = c("ELECTIVE","EMERGENCY","NEWBORN","URGENT")),
   insurance = factor(insurance, levels = c("Government","Medicaid","Medicare","Private","Self Pay")),
-  ExpiredHospital=factor(ExpiredHospital),
-  LOSgroupNum=factor(LOSgroupNum)
-  )
-cate_data <- cbind(cate_data, factor(mimic3d_clean$ExpiredHospital), factor(mimic3d_clean$LOSgroupNum))
-names <- c("LOSdays_Less2","gender","admit_type","insurance","ExpiredHospital","LOSgroupNum")
-colnames(cate_data) <- names
+  ExpiredHospital=factor(ExpiredHospital))
+
 # Chi_square_test on category variables
 CategoryTest <- CategoryDependence$new(cate_data, 
-                                       predictor_x=c("gender","admit_type","insurance","ExpiredHospital","LOSgroupNum"),
+                                       predictor_x=c("gender","admit_type","insurance","ExpiredHospital"),
                                        response_y="LOSdays_Less2")
 CategoryTest$p_value
+```
+
+```{r}
+#Model selection
+predictor_x<-c("age","NumCallouts","NumDiagnosis","NumProcs","NumCPTevents",
+               "NumInput","NumLabs","NumMicroLabs","NumNotes","NumOutput",
+               "NumRx","NumProcEvents","NumTransfers","NumChartEvents","TotalNumInteract")
+response_y<-c("LOSdays")
+
+candidates<-list()
+#for(i in 1:10){
+#  predx<-c(predictor_x[sample(1:length(predictor_x), 5)])
+#  RegressionTest<-BayesianRegression$new(train_data, responseV=c("LOSdays"), predictorV=predx, prior_sigma=c(8,10), prior_beta=list(m=rep(0,6), V=diag(nrow = 6)) )
+#  rss<-RegressionTest$PredictiveCheck(train_data)
+#  candidates[[i]]<-c(predx, rss)
+#}
 ```
 
 ```{r}
