@@ -92,7 +92,7 @@ test_data <- test_cat %>% transmute(
   resp = ifelse(resp <= 2, 1, 0),
   var1 = factor(Var1, levels = c("X", "Y"), labels = c(1, 0)),
   var2 = factor(Var2, levels = c("M", "N"), labels = c(1, 0)))
-test_data <- cbind(test_data, test_cat$Var3)
+test_data <- cbind(test_data, factor(test_cat$Var3))
 Names <- c("resp","Var1","Var2","Var3")
 colnames(test_data) <- Names
 
