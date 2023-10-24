@@ -126,7 +126,7 @@ old_distinct <- old %>% distinct(old$user_id, .keep_all = TRUE)
 new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
 
 # Part 2
-mimic3d<-read.csv("mimic3d.csv", header = TRUE)%>%select(-c("insurance", "religion", "marital_status"))%>%na.omit()
+mimic3d<-read.csv("mimic3d.csv", header = TRUE)%>%select(-c("gender","admit_location","AdmitDiagnosis","religion","marital_status","ethnicity","AdmitProcedure","LOSgroupNum"))%>%na.omit()
 train_data<-mimic3d[1:47180,]
 test_data<-mimic3d[47181:nrow(mimic3d),]
 ```
@@ -335,21 +335,35 @@ In terms of conversion rate performance, since the probability that the new page
 
 ```{R}
 # Transform categorical data
-mimic3d_clean <- na.omit(subset(read.csv("mimic3d.csv", header = TRUE),select = -marital_status))
+mimic3d_clean <- na.omit(subset(read.csv("mimic3d.csv", header = TRUE),select = c(LOSdays, gender, admit_type, insurance, ExpiredHospital)))
 cate_data <- mimic3d_clean %>% transmute(
-  LOSdays_Less2 = factor(ifelse(LOSdays <= 2, 1, 0)), 
+  LOSdays_Less2 = factor(ifelse(LOSdays < 2, 1, 0)), 
   gender = factor(gender, levels = c("F", "M")), 
   admit_type = factor(admit_type, levels = c("ELECTIVE","EMERGENCY","NEWBORN","URGENT")),
   insurance = factor(insurance, levels = c("Government","Medicaid","Medicare","Private","Self Pay")),
-  ExpiredHospital=factor(ExpiredHospital),
-  LOSgroupNum=factor(LOSgroupNum)
-  )
+  ExpiredHospital=factor(ExpiredHospital))
 
 # Chi_square_test on category variables
 CategoryTest <- CategoryDependence$new(cate_data, 
-                                       predictor_x=c("gender","admit_type","insurance","ExpiredHospital","LOSgroupNum"),
+                                       predictor_x=c("gender","admit_type","insurance","ExpiredHospital"),
                                        response_y="LOSdays_Less2")
 CategoryTest$p_value
+```
+
+```{r}
+#Model selection
+predictor_x<-c("age","NumCallouts","NumDiagnosis","NumProcs","NumCPTevents",
+               "NumInput","NumLabs","NumMicroLabs","NumNotes","NumOutput",
+               "NumRx","NumProcEvents","NumTransfers","NumChartEvents","TotalNumInteract")
+response_y<-c("LOSdays")
+
+candidates<-list()
+#for(i in 1:10){
+#  predx<-c(predictor_x[sample(1:length(predictor_x), 5)])
+#  RegressionTest<-BayesianRegression$new(train_data, responseV=c("LOSdays"), predictorV=predx, prior_sigma=c(8,10), prior_beta=list(m=rep(0,6), V=diag(nrow = 6)) )
+#  rss<-RegressionTest$PredictiveCheck(train_data)
+#  candidates[[i]]<-c(predx, rss)
+#}
 ```
 
 ```{r}

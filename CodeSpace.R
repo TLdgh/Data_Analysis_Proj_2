@@ -219,6 +219,25 @@ BayesianRegression<-setRefClass(
           bargap = 0.5
         )
       return(p)
+    },
+    
+    PredictiveCheck=function(train_data){
+      PosSample<-posteriorSample%>%select(param, value)%>%group_by(param)%>%
+        mutate(row=row_number())%>%pivot_wider(names_from=param, values_from=value)%>%select(-row)
+      
+      betas<-PosSample%>%select(-sigmasq)
+      
+      #Calculate Residual Sum of Squares
+      design_x<-train_data%>%mutate(Intercept=1)%>%select(all_of(c("Intercept",predictorV)))%>%as.matrix()
+      y<-train_data%>%select(all_of(responseV))%>%as.matrix(ncol=1)
+      
+      RSS<-apply(betas, 1, function(x){
+        y_star<-design_x%*%matrix(x, ncol = 1)
+        RSS<-t(y-y_star)%*%(y-y_star)
+        return(RSS)
+      })
+      
+      return(mean(RSS))
     }
   )
 )
