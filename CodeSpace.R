@@ -88,41 +88,41 @@ CategoryDependence <- setRefClass(
   "CategoryDependence",
   fields = list(
     df = "data.frame",
-    p_value = "list"
+    predictor_x="character",
+    response_y="character",
+    p_value = "data.frame",
+    ContingencyTbl="list"
   ),
-  # create a list contain pairwise comparsion between cate variables and LOSdays_less2
-  # create df1 containing  column 1  and column 2, put df1 into first place in a list 
-  # create df2 containing column 1 and column 3, put df2 into 2nd of the list, 
-  # create df3 containing column 1 and 4, put df3 into 3rd of the list, 
-  # create df4 containing  column 1  and 5, put df4 into 4th in list, 
-  # create df5 containing column 1 and 6, put df5 into 5rd of the list.
+  
   methods = list(
-    initialize = function(df) {
-      .self$df <- df
-      .self$p_value <- .self$chi_square_test()
+    initialize = function(df, predictor_x, response_y) {
+      #make a contingency table for the variable X and Y
+      .self$ContingencyTbl <- .self$create_list(df, predictor_x, response_y)
+      
+      #calculate the pvalues and make a data frame
+      .self$p_value <- .self$chi_square_test(my_list=ContingencyTbl)
     },
-    create_list = function() {
+    create_list = function(df, predictor_x, response_y){
       my_list <- list()
-      for (i in 2:ncol(df)) {
-        df_name <- colnames(.self$df)[i]
-        new_df <- data.frame(.self$df[[1]], 
-                             .self$df[[i]])
-        my_list[[df_name]] <- new_df
-      }
+      for(x in predictor_x){
+        my_list[[x]]<-df%>%select(all_of(c(x, response_y)))%>%na.omit()%>%
+          group_by(across(everything(), as.factor))%>%tally()%>%spread(key=response_y, value=n)}
       return(my_list)
     },
+    
     # Do chi square test through the list
-    chi_square_test = function() {
-      p_value <<- list()
-      for (i in 2:ncol(.self$df)) {
-        v <- colnames(.self$df)[i]
-        my_df <- .self$create_list()[[v]]
-        chi_square_table <- table(my_df)
-        chi_square_result <- chisq.test(chi_square_table)
-        # Perform pvalue into df
-        p_value[[v]] <<- chi_square_result$p.value
-      }
-      return(p_value)
+    chi_square_test = function(my_list){
+      res<-map(my_list, function(x){
+        if(any(is.na(x))==FALSE){
+          y<-ungroup(x)%>%select(-any_of(group_vars(x)))%>%as.matrix()%>%chisq.test()
+          return(c(y$p.value, y$statistic))
+        }else{return("Has no values in Contingency Table")}
+      })
+      
+      res<-res%>%data.frame(row.names = c("p-value", "X-statistic"))%>%
+        mutate(across(where(is.numeric), .fns = ~as.character(signif(.,4))))
+      
+      return(res)
     }
   )
 )
@@ -190,7 +190,7 @@ BayesianRegression<-setRefClass(
       p<-posteriorSample%>%ggplot(aes(x=value)) +
         geom_histogram(aes(y=after_stat(density)), bins = 50, fill="skyblue", color="black") +
         geom_density(colour='blue', linewidth = 0.5) +
-        geom_vline(data=df_vline, aes(xintercept = params_est), linetype = 'dashed', size = 1)+
+        geom_vline(data=df_vline, aes(xintercept = params_est), linetype = 'dashed', linewidth = 1)+
         geom_text(data=df_vline, aes(x= params_est, label = paste("Param_Est:", round(params_est,4)), y=Inf),size = 2,hjust=0, vjust=2) + 
         facet_wrap(~labels, scales = 'free',labeller = label_parsed) + theme_bw() +
         labs(x = 'Parameters', y = 'Density',title = 'Posterior Density')
@@ -205,9 +205,9 @@ BayesianRegression<-setRefClass(
       test_data<-test_data%>%select(all_of(c(predictorV, responseV)))
       x<-test_data%>%select(all_of(predictorV))%>%mutate(Intercept=1)%>%as.matrix()
       y<-test_data%>%select(all_of(responseV))%>%as.matrix(ncol=1)
-
+      
       betas<-betas%>%arrange(match(param, colnames(x)))%>%filter(param!="sigmasq")%>%column_to_rownames(var = "param") %>% data.matrix()
-
+      
       y_star<-x%*%betas
       
       p<-data.frame(y=as.numeric(y), y_star=as.numeric(y_star))%>%gather(key="data", value = "value")%>%mutate(value=ifelse(value>=0, value, 0))%>%
