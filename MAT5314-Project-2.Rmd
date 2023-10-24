@@ -135,7 +135,7 @@ Next we want to talk about the choice of prior distribution. In order to compare
 
 From the above proof process, we conclude that if the prior distribution is $Beta(\alpha,\beta)$, the likelihood obeys the binomial distribution, then the posterior is $Beta(\alpha+s,\beta+n-s)$, where $n$ is the sample size, $s$ is the summation of converted. With this, we can form the model.
 
-The figure showed the PDF of the probability density function of the Beta distribution for five sets of values of the parameters $\alpha$ and $\beta$. From this we can see that different values of $alpha$ and $beta$ can have a great impact on the shape of the Beta distribution, the range of the distribution, and so on. 
+The figure showed the probability density function of the Beta distribution for five sets of values of the parameters $\alpha$ and $\beta$. From this we can see that different values of $alpha$ and $beta$ can have a great impact on the shape of the Beta distribution, the range of the distribution, and so on. 
 ```{r}
 parameters <- data.frame(
   alpha = c(0.5, 5, 1, 3, 2),
