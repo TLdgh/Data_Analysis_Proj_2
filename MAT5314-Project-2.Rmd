@@ -27,7 +27,7 @@ library(tidyverse)
 library(kableExtra)
 library(htmlwidgets)
 library(webshot)
-#library(gridExtra)
+library(randomForest)
 ```
 
 ```{r}
@@ -442,7 +442,6 @@ Here is a brief introduction to the principle of this algorithm. First we divide
 For every $i^{th}$feature, we destroy its correlation by random permutations and then recalculate the model's out-of-bag error. The feature importance can be calculated by comparing the out-of-bag error of the original model and the model after destroying the feature (via calculating and compare the average error before and after the disruption). A larger error increase indicates that the feature contributes more to the model's performance and this feature would be considered as a more important feature. Although this method has defect when dealing with features of different sizes (random forest prefers features with large sizes), in our case, there is no such drawback because the features have the same size.
 
 ```{r}
-library(randomForest)
 cate_data_WithoutGender <- cate_data %>% select(-gender)
 target <- cate_data_WithoutGender$LOSdays_Less2
 features <- cate_data_WithoutGender[, -1]
@@ -455,8 +454,9 @@ print(feature_importance)
 ```
 From the above result, we see the feature importance of ExpiredHospital is much greater than other two. ExpiredHospital contributes more to the target. However, ExpiredHospital indicates whether the patient died within the given hospitalization. 1 indicates death in the hospital, and 0 indicates survival to hospital discharge. (https://mimic.mit.edu/docs/iii/tables/admissions/). THis feature should be logged after the process ends. Logically, in-hospital death should not be used as a feature to predict a patient's length of stay. 
 
+For the numerical variables, intuitively we thought the results for patient input and output, lab test and note were not really relavent to the length of stay. We considered the following variables that are definitly related to the response: NumDiagnosis, which represents the time of diagnosis when the patient was admitted, NumProcs, which represented the result of procedures, NumTransfers, which showed the number of transfers of the patient between departments of the hospital, TotalNumInteract, which is the total number of interactions between patient and the caregiver, and finally NumCallouts, the time at discharge. We left with age, NumProcEvents and NumChartEvents variable unsure. We therefore perform a sequential model fitting by adding each of these three variables to the base model and see if the posterior predictive checking can eliminate any of the variables.
+
 ```{r}
-```{r,eval=FALSE}
 mimic3d_clean<-mimic3d%>%select(-c("hadm_id","gender","admit_type","admit_location","AdmitDiagnosis",
                                    "insurance","religion","marital_status","ethnicity",
                                    "AdmitProcedure","NumCPTevents","NumInput","NumLabs","NumMicroLabs",
@@ -480,28 +480,35 @@ predictor_x_6<-c("NumProcEvents","NumChartEvents","NumDiagnosis","NumTransfers",
 predictor_x_7<-c("age","NumProcEvents","NumChartEvents","NumDiagnosis","NumTransfers","TotalNumInteract","NumCallouts")
 model_list<-list(predictor_x_0,predictor_x_1,predictor_x_2,predictor_x_3,predictor_x_4,
                  predictor_x_5,predictor_x_6,predictor_x_7)
+```
 
+```{r,eval=FALSE}
 candidates<-list()
 for(i in model_list){
   m<-c(0, 50, 0.7, 530, 2.7, 1, 637, 0.1)
-  RegressionTest<-BayesianRegression$new(train_data, responseV=c("LOSdays"), predictorV=i, prior_sigma=c(0.2,40), prior_beta=list(m=m[1:(length(i)+1)], V=diag(nrow = (length(i)+1))) )
+  RegressionTest<-BayesianRegression$new(train_data, responseV=c("LOSdays"), predictorV=i, prior_sigma=c(2,200), prior_beta=list(m=rep(0,(length(i)+1)), V=diag(nrow = (length(i)+1))) )
   rss<-RegressionTest$PredictiveCheck(train_data)
   candidates<-c(candidates, list(list(Predictors=i, MeanRSS=rss)))
 }
 candidates
 ```
 
-For the numerical variables, intuitively we thought the results for patient input and output, lab test and note were not really relavent to the length of stay. We considered the following variables that are definitly related to the response: NumDiagnosis, which represents the time of diagnosis when the patient was admitted, NumProcs, which represented the result of procedures, NumTransfers, which showed the number of transfers of the patient between departments of the hospital, TotalNumInteract, which is the total number of interactions between patient and the caregiver, and finally NumCallouts, the time at discharge. We left with age, NumProcEvents and NumChartEvents variable unsure. We therefore perform a sequential model fitting by adding each of these three variables to the base model and see if the posterior predictive checking can eliminate any of the variables.
+Finally we fit the regression model to the data set. 
 
-```{r,eval=FALSE}
+```{r}
 #Bayesian Regression Analysis
-RegressionTest<-BayesianRegression$new(train_data, c("LOSdays"), c("age","NumProcEvents","NumChartEvents","NumDiagnosis","NumProcs","NumTransfers","TotalNumInteract","NumCallouts"), 
-                                       prior_sigma=c(8,10), prior_beta=list(m=rep(0,9), V=diag(nrow = 9)) )
+RegressionTest<-BayesianRegression$new(train_data, c("LOSdays"), c("age","NumProcEvents","NumChartEvents","NumDiagnosis","NumTransfers","TotalNumInteract","NumCallouts"), 
+                                       prior_sigma=c(2,200), prior_beta=list(m=rep(0,8), V=diag(nrow=8)) )
+```
+
+We did a prediction of the test data.
+
+```{r}
 RegressionTest$PosteriorPlot()%>%print()
 PredictP<-RegressionTest$PredictionPlot(test_data)
 
 saveWidget(widget = PredictP, file = "./Figures/PredictP.html")
-shots<-webshot(url = "./Figures/PredictP.html", file = "./Figures/PredictP.png", delay = 1, zoom = 2, vheight = 400, vwidth = 500)
+shots<-webshot(url = "./Figures/PredictP.html", file = "./Figures/PredictP.png", delay = 1, zoom = 2, vheight = 200, vwidth = 300)
 ```
 
 ```{r, echo=FALSE, fig.align='center', fig.cap = "Prediction Plot"}
