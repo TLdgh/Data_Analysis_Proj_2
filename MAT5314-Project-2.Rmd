@@ -349,6 +349,25 @@ CategoryTest <- CategoryDependence$new(cate_data,
                                        response_y="LOSdays_Less2")
 CategoryTest$p_value
 ```
+From the chisquare test results above, we can see that feature “gender” has a pvalue greater than 0.05, so we can reject the dependence of gender and our target variable(LOSdays < 2 days)
+
+Consider the rest features, to determine the trade-off of categorical variables, we use randomForest in R. This function implements Breiman’s random forest algorithm. We hope to calculate feature importance with the help of Breiman’s random forest algorithm.  
+Here is a brief introduction to the principle of this algorithm. First we divide the data into predictor (feature) and target (response). In this way we get the data set $Dateset = {\{(X_i,Y_i)\}_{i=1}^{n}}$, where $X_i$ is the $i^{th}$ predictor, $Y_i$ is the $i^{th}$ target. Next, we do Bootstrap Sampling on the dataset (a kind of sampling with replacement, in this sampling method, about 36% of the samples will never be sampled, ) to form multiple subsets, and then construct individual decision tree for each of them. Based on our sampling method, about 36% of the samples will never appear in any subset of the decision tree. Such samples are called out-of-bag data. After all trees are constructed, the average error on the out-of-bag data is calculated to obtain the out-of-bag error of the model.
+For every $i^{th}$feature, we destroy its correlation by random permutations and then recalculate the model's out-of-bag error. The feature importance can be calculated by comparing the out-of-bag error of the original model and the model after destroying the feature (via calculating and compare the average error before and after the disruption). A larger error increase indicates that the feature contributes more to the model's performance and this feature would be considered as a more important feature. Although this method has defect when dealing with features of different sizes (random forest prefers features with large sizes), in our case, there is no such drawback because the features have the same size.
+
+```{r}
+library(randomForest)
+cate_data_WithoutGender <- cate_data %>% select(-gender)
+target <- cate_data_WithoutGender$LOSdays_Less2
+features <- cate_data_WithoutGender[, -1]
+
+model <- randomForest(x = features, y = target, ntree = 100)
+
+feature_importance <- importance(model)
+
+print(feature_importance)
+```
+From the above result, we see the feature importance of ExpiredHospital is much greater than other two. ExpiredHospital contributes more to the target. However, ExpiredHospital indicates whether the patient died within the given hospitalization. 1 indicates death in the hospital, and 0 indicates survival to hospital discharge. (https://mimic.mit.edu/docs/iii/tables/admissions/). THis feature should be logged after the process ends. Logically, in-hospital death should not be used as a feature to predict a patient's length of stay. 
 
 ```{r}
 #Model selection
@@ -379,6 +398,5 @@ shots<-webshot(url = "./Figures/PredictP.html", file = "./Figures/PredictP.png",
 ```{r, echo=FALSE, fig.align='center', fig.cap = "Prediction Plot"}
 knitr::include_graphics("./Figures/PredictP.png")
 ```
-
 
 # References
