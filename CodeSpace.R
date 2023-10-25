@@ -210,7 +210,9 @@ BayesianRegression<-setRefClass(
       
       y_star<-x%*%betas
       
-      p<-data.frame(y=as.numeric(y), y_star=as.numeric(y_star))%>%gather(key="data", value = "value")%>%mutate(value=ifelse(value>=0, value, 0))%>%
+      p<-data.frame(y=as.numeric(y), y_star=as.numeric(y_star))%>%gather(key="data", value = "value")%>%
+        mutate(value=ifelse(value>=0, value, 0))%>%
+        mutate(value=ifelse(value<=50, value, 50))%>%
         plot_ly(x = ~value, color=~data, type = "histogram",nbinsx=200)%>% 
         layout(
           title = "Histogram Plot",

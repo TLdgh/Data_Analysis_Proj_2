@@ -27,7 +27,7 @@ library(tidyverse)
 library(kableExtra)
 library(htmlwidgets)
 library(webshot)
-#library(gridExtra)
+library(randomForest)
 ```
 
 ```{r}
@@ -110,7 +110,7 @@ head(duplicates)
 
 filtered_data <- ab_data %>%
   filter((group == "control" & landing_page == "new_page") |
-         (group == "treatment" & landing_page == "old_page"))
+           (group == "treatment" & landing_page == "old_page"))
 
 head(filtered_data, 4)
 ```
@@ -126,9 +126,7 @@ old_distinct <- old %>% distinct(old$user_id, .keep_all = TRUE)
 new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
 
 # Part 2
-mimic3d<-read.csv("mimic3d.csv", header = TRUE)%>%select(-c("gender","admit_location","AdmitDiagnosis","religion","marital_status","ethnicity","AdmitProcedure","LOSgroupNum"))%>%na.omit()
-train_data<-mimic3d[1:47180,]
-test_data<-mimic3d[47181:nrow(mimic3d),]
+mimic3d<-read.csv("mimic3d.csv", header = TRUE)
 ```
 
 Next we want to talk about the choice of prior distribution. In order to compare the old and new pages, we need to model the conversion rates of the old and new pages. Since the conversion rate is in $[0,1]$, we can choose the Beta distribution as the prior.  
@@ -220,10 +218,10 @@ beta_prior <- 20
 
 #using non-informative priors, subset size = 100
 my_instance <- BayesianSample$new(old_distinct,new_distinct,rows_per_subset = 1000,
-                           alpha_prior_old=1,
-                           alpha_prior_new=1,
-                           beta_prior_old=1,
-                           beta_prior_new=1)
+                                  alpha_prior_old=1,
+                                  alpha_prior_new=1,
+                                  beta_prior_old=1,
+                                  beta_prior_new=1)
 
 frame0<-my_instance$calculateMean()
 ggplot(frame0, aes(x = size, y = value)) +
@@ -232,10 +230,10 @@ ggplot(frame0, aes(x = size, y = value)) +
 
 #using informative priors, subset size = 100
 my_instance <- BayesianSample$new(old_distinct,new_distinct,rows_per_subset = 1000,
-                           alpha_prior_old=2,
-                           alpha_prior_new=2,
-                           beta_prior_old=20,
-                           beta_prior_new=20)
+                                  alpha_prior_old=2,
+                                  alpha_prior_new=2,
+                                  beta_prior_old=20,
+                                  beta_prior_new=20)
 
 frame1<-my_instance$calculateMean()
 ggplot(frame1, aes(x = size, y = value)) +
@@ -333,10 +331,98 @@ The figure also shows the density function of the conversion rate of the new and
 
 In terms of conversion rate performance, since the probability that the new page is better than the old page is only about `r mean(posterior_new > posterior_old)`. At the same time, the graphed information shows that the conversion rate expectation of the new page is actually lower than that of the old page. There is no significant evidence that changing to a new page will increase visitor conversion rates.
 
+# Bayesian Regression Analysis
+
+In the ordinary linear regression analysis, one specifies the model as
+$$
+\vec{y}=\vec{x}\cdot \vec{\beta}+\vec{\epsilon}
+$$
+where 
+$\vec{y}=\begin{bmatrix} y_1\\ \vdots\\ y_n \end{bmatrix}$ is the response variable, $\vec{x}=\begin{bmatrix} 1 & x_{11} & \cdots & x_{1k}\\ \vdots & & \vdots\\ 1 & x_{n1} & \cdots & x_{nk} \end{bmatrix}$ is the design matrix containing the predictor variables, $\vec{\beta}=\begin{bmatrix} \beta_0 \\ \vdots\\ \beta_{k-1} \end{bmatrix}$ is the unknown parameters of the linear model to be estimated, and $\vec{\epsilon}=\begin{bmatrix} \epsilon_1\\ \vdots\\ \epsilon_n \end{bmatrix}$ is the random error in the model assumed to have Multivariate Normal distribution $N_n(0_n, \sigma^2 I_n)$. 
+
+In the Bayesian framework, we have the same model structure, however with the additional prior assumption for our unknown parameters. In particular, one assumes that $\sigma^2$ has an InverseGamma(a,b) distribution, and $\vec{\beta} | \sigma^2$ has a mixture distribution of Multivariate Normal $N_k(m, \sigma^2 V$). The resulted posterior distribution is the product of the kernel densities of Multivariate Normal $N_k(\mu, \sigma^2 \Sigma$) and InverseGamma($a^*$, $b^*$), where
+\begin{gather*}
+\mu:=(x^Tx + V^{-1})^{-1}(x^Ty +V^{-1}m)\\
+\Sigma:=(x^Tx + V^{-1})^{-1}\\
+a^*:=\frac{n}{2}+a\\
+b^*:=\frac{1}{2}(m^TV^{-1}m - \mu^T \Sigma^{-1}\mu +y^Ty +2b)
+\end{gather*}
+
+Therefore we have conjugate priors in this case, which is not necessarily possible in general. For simplicity and practicality we adopted this approach. In our analysis, we specified the prior of the variance $\sigma^2$ as general as possible. One could use the reciprocal of $\sigma^2$ which gives an uniform prior, however we did not choose this prior for the reason that the uniform prior is improper with range from $-\infty$ to $+\infty$. We believed that the variance is still finite since a patient cannot stay in the hospital for an infinite period, hence the variance of the length of stay should not go to infinite. In Figure below, we showed a few possible density lines of the InverseGamma distribution. We chose a=2 and b=200 to have a less informative prior.
+
+```{r}
+x<-seq(1, 300, 1)
+dinvgamma<-function(x, alpha, beta){beta^alpha/gamma(alpha)*x^(-alpha-1)*exp(-beta/x)}
+
+pIG<-data.frame(x,y1=dinvgamma(x,2,100),y2=dinvgamma(x,2,200),y3=dinvgamma(x, 2,300))%>%
+  plot_ly(x=~x, y=~y1, type = "scatter", mode="lines", name = "alpha=2, beta=100")%>%
+  add_trace(y=~y2, type = "scatter", mode="lines", name = "alpha=2, beta=200")%>%
+  add_trace(y=~y3, type = "scatter", mode="lines", name = "alpha=2, beta=300")%>%
+  layout(title=list(text="Probability density function of Inverse Gamma Distribution", font=list(size=8)))
+
+saveWidget(widget = pIG, file = "./Figures/pIG.html")
+shots<-webshot(url = "./Figures/pIG.html", file = "./Figures/pIG.png", delay = 1, zoom = 2, vheight = 200, vwidth = 400)
+```
+
+```{r, echo=FALSE, fig.align='center', fig.cap = "Inverse Gamma Plot"}
+knitr::include_graphics("./Figures/pIG.png")
+```
+
+To select the appropriate model, we did a predictive check. For every posterior sample we got from the posterior distribution, we ran the model to predict the response variable y with the same predictor variables that was used in the model training/fitting procedure. We then compared the resulting estimated response $\hat{y}$ with the true response y in the training data set by calculating the residual sum of squares $RSS:=\sum_{i=1}^n (\hat{y}-y)^2$. We averaged this value across all the posterior samples. In other words, we were predicting the same response data set that was used to fit the model by using the same observed predictor variables. Intuitively, one would expect that this prediction is perfect, resulting an average RSS equal to 0. It is not possible because of the random nature of our linear model, hence   we chose the model that has the smallest average RSS. 
+
+We first created a brief data dictionary for this data set:
+
+```{r}
+DataDict<-data.frame(
+  Variables=colnames(mimic3d),
+  Type=sapply(mimic3d, function(x) class(x)),
+  Example=sapply(mimic3d, function(x) paste(as.character(head(unique(x),3)), collapse = ", ")),
+  Number.Unique=sapply(mimic3d, function(x) length(unique(x))),
+  PctMissing=sapply(mimic3d, function(x) sum(is.na(x))/length(x)),
+  Comment=c("ID number",
+            "Gender",
+            "Age",
+            "Length of stay in days",
+            "Type of admission",
+            "Location admitted",
+            "Diagnosis when admitted",
+            "Insurance",
+            "Religion",
+            "Marital Status",
+            "Ethnicity",
+            "time ICU discharged, a.k.a 'called out'",
+            "Result of diagnosis",
+            "Result of procedures", 
+            "Procedured when admitted",  
+            "Result of CPT events for billing",
+            "Result of drug administered",
+            "Result of labs",
+            "Result of microbiology labs",
+            "Result of notes recorded",
+            "Result of fluid excreted by patients",
+            "Unknown",
+            "Result of Procedures events",
+            "Result of transfers",
+            "Result of events chart data recorded",
+            "If Hospital card has expired",
+            "Total number of interactions",
+            "Group number of LOSdays"
+  )
+)
+
+DataDict%>%remove_rownames()%>%kable(booktabs = TRUE,caption = "Data Variable Definition")%>%
+  kable_styling(font_size=10, latex_options=c("striped","scale_down","hold_position"))%>%
+  column_spec(4, width = "8em")%>%
+  row_spec(0,bold=TRUE)
+
+```
+
+We remove all the categorical variables.
+
 ```{R}
 # Transform categorical data
-mimic3d_clean <- na.omit(subset(read.csv("mimic3d.csv", header = TRUE),select = c(LOSdays, gender, admit_type, insurance, ExpiredHospital)))
-cate_data <- mimic3d_clean %>% transmute(
+mimic3d_cat <- na.omit(subset(mimic3d,select = c(LOSdays, gender, admit_type, insurance, ExpiredHospital)))
+cate_data <- mimic3d_cat %>% transmute(
   LOSdays_Less2 = factor(ifelse(LOSdays < 2, 1, 0)), 
   gender = factor(gender, levels = c("F", "M")), 
   admit_type = factor(admit_type, levels = c("ELECTIVE","EMERGENCY","NEWBORN","URGENT")),
@@ -356,7 +442,6 @@ Here is a brief introduction to the principle of this algorithm. First we divide
 For every $i^{th}$feature, we destroy its correlation by random permutations and then recalculate the model's out-of-bag error. The feature importance can be calculated by comparing the out-of-bag error of the original model and the model after destroying the feature (via calculating and compare the average error before and after the disruption). A larger error increase indicates that the feature contributes more to the model's performance and this feature would be considered as a more important feature. Although this method has defect when dealing with features of different sizes (random forest prefers features with large sizes), in our case, there is no such drawback because the features have the same size.
 
 ```{r}
-library(randomForest)
 cate_data_WithoutGender <- cate_data %>% select(-gender)
 target <- cate_data_WithoutGender$LOSdays_Less2
 features <- cate_data_WithoutGender[, -1]
@@ -369,30 +454,61 @@ print(feature_importance)
 ```
 From the above result, we see the feature importance of ExpiredHospital is much greater than other two. ExpiredHospital contributes more to the target. However, ExpiredHospital indicates whether the patient died within the given hospitalization. 1 indicates death in the hospital, and 0 indicates survival to hospital discharge. (https://mimic.mit.edu/docs/iii/tables/admissions/). THis feature should be logged after the process ends. Logically, in-hospital death should not be used as a feature to predict a patient's length of stay. 
 
-```{r}
-#Model selection
-predictor_x<-c("age","NumCallouts","NumDiagnosis","NumProcs","NumCPTevents",
-               "NumInput","NumLabs","NumMicroLabs","NumNotes","NumOutput",
-               "NumRx","NumProcEvents","NumTransfers","NumChartEvents","TotalNumInteract")
-response_y<-c("LOSdays")
+For the numerical variables, intuitively we thought the results for patient input and output, lab test and note were not really relavent to the length of stay. We considered the following variables that are definitly related to the response: NumDiagnosis, which represents the time of diagnosis when the patient was admitted, NumProcs, which represented the result of procedures, NumTransfers, which showed the number of transfers of the patient between departments of the hospital, TotalNumInteract, which is the total number of interactions between patient and the caregiver, and finally NumCallouts, the time at discharge. We left with age, NumProcEvents and NumChartEvents variable unsure. We therefore perform a sequential model fitting by adding each of these three variables to the base model and see if the posterior predictive checking can eliminate any of the variables.
 
-candidates<-list()
-#for(i in 1:10){
-#  predx<-c(predictor_x[sample(1:length(predictor_x), 5)])
-#  RegressionTest<-BayesianRegression$new(train_data, responseV=c("LOSdays"), predictorV=predx, prior_sigma=c(8,10), prior_beta=list(m=rep(0,6), V=diag(nrow = 6)) )
-#  rss<-RegressionTest$PredictiveCheck(train_data)
-#  candidates[[i]]<-c(predx, rss)
-#}
+```{r}
+mimic3d_clean<-mimic3d%>%select(-c("hadm_id","gender","admit_type","admit_location","AdmitDiagnosis",
+                                   "insurance","religion","marital_status","ethnicity",
+                                   "AdmitProcedure","NumCPTevents","NumInput","NumLabs","NumMicroLabs",
+                                   "NumNotes","NumOutput","NumRx","ExpiredHospital","LOSgroupNum"))%>%na.omit()
+
+train_data<-mimic3d_clean[1:47180,]
+test_data<-mimic3d_clean[47181:nrow(mimic3d_clean),]
+
+#Model selection
+predictor_x_0<-c("NumDiagnosis","NumTransfers","TotalNumInteract","NumCallouts")
+
+predictor_x_1<-c("age","NumDiagnosis","NumTransfers","TotalNumInteract","NumCallouts")
+predictor_x_2<-c("NumProcEvents","NumDiagnosis","NumTransfers","TotalNumInteract","NumCallouts")
+predictor_x_3<-c("NumChartEvents","NumDiagnosis","NumTransfers","TotalNumInteract","NumCallouts")
+
+predictor_x_4<-c("age","NumProcEvents","NumDiagnosis","NumTransfers","TotalNumInteract","NumCallouts")
+predictor_x_5<-c("age","NumChartEvents","NumDiagnosis","NumTransfers","TotalNumInteract","NumCallouts")
+
+predictor_x_6<-c("NumProcEvents","NumChartEvents","NumDiagnosis","NumTransfers","TotalNumInteract","NumCallouts")
+
+predictor_x_7<-c("age","NumProcEvents","NumChartEvents","NumDiagnosis","NumTransfers","TotalNumInteract","NumCallouts")
+model_list<-list(predictor_x_0,predictor_x_1,predictor_x_2,predictor_x_3,predictor_x_4,
+                 predictor_x_5,predictor_x_6,predictor_x_7)
 ```
 
 ```{r,eval=FALSE}
+candidates<-list()
+for(i in model_list){
+  m<-c(0, 50, 0.7, 530, 2.7, 1, 637, 0.1)
+  RegressionTest<-BayesianRegression$new(train_data, responseV=c("LOSdays"), predictorV=i, prior_sigma=c(2,200), prior_beta=list(m=rep(0,(length(i)+1)), V=diag(nrow = (length(i)+1))) )
+  rss<-RegressionTest$PredictiveCheck(train_data)
+  candidates<-c(candidates, list(list(Predictors=i, MeanRSS=rss)))
+}
+candidates
+```
+
+Finally we fit the regression model to the data set. 
+
+```{r}
 #Bayesian Regression Analysis
-RegressionTest<-BayesianRegression$new(train_data, c("LOSdays"), c("NumTransfers"), prior_sigma=c(8,10), prior_beta=list(m=c(0,0), V=matrix(c(10,3,4,6), nrow=2, byrow = TRUE)) )
+RegressionTest<-BayesianRegression$new(train_data, c("LOSdays"), c("age","NumProcEvents","NumChartEvents","NumDiagnosis","NumTransfers","TotalNumInteract","NumCallouts"), 
+                                       prior_sigma=c(2,200), prior_beta=list(m=rep(0,8), V=diag(nrow=8)) )
+```
+
+We did a prediction of the test data.
+
+```{r}
 RegressionTest$PosteriorPlot()%>%print()
 PredictP<-RegressionTest$PredictionPlot(test_data)
 
 saveWidget(widget = PredictP, file = "./Figures/PredictP.html")
-shots<-webshot(url = "./Figures/PredictP.html", file = "./Figures/PredictP.png", delay = 1, zoom = 2, vheight = 400, vwidth = 500)
+shots<-webshot(url = "./Figures/PredictP.html", file = "./Figures/PredictP.png", delay = 1, zoom = 2, vheight = 200, vwidth = 300)
 ```
 
 ```{r, echo=FALSE, fig.align='center', fig.cap = "Prediction Plot"}
