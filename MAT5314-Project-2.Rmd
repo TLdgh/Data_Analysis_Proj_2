@@ -62,7 +62,15 @@ $$
 
 With such definition, it is perfectly fine to interpret the credible interval as: the probability that our success rate falls within the given credible interval is (1-$\alpha$)%. 
 
-Suppose we assume $Beta(\alpha, \beta)$ is the prior distribution of the success rate p. The prior density function is:
+We chose Beta distribution as the prior dirstribution, because of three reasons:
+
+1. We observed that Beta distribution is located between 0 and 1. We think of the horizontal axis of the curve as the value of the probability of a transition occurring in a trial, and the vertical axis as the probability that that value will occur. This just fits our experimental design.  
+
+2. The Beta distribution can take on various shapes by changing its parameters.  
+
+3. When the likelihood obeys the binomial distribution and the prior obeys the Beta distribution, the posterior distribution is also a Beta distribution, which means that the prior and posterior are conjugate distributions and are easy to calculate. The advantage is that as the appearance of newly added samples, we can quickly derive the posterior distribution.
+
+Suppose we assume p is the success rate of $Beta(\alpha, \beta)$, then the prior density function is:
 $$
 f(p; \alpha,\beta) = \frac{\Gamma(\alpha+\beta)}{\Gamma(\alpha)\Gamma(\beta)} p^{\alpha-1} (1-p)^{\beta-1}, ~ p\in (0,1)
 $$
@@ -89,7 +97,7 @@ One can see that asymptotically when we have a large sample size n, the mean of 
 
 # Method
 
-As the marketing people wanted to discover whether the new web page had a higher conversion rate than the old one, we collected a data set which contained users' visits and conversion information of the old and new web pages. In this project, we did a Bayesian AB test. The posterior distributions of old web page and new web page are stored and updated by continuously increasing the number of samples to form a new subset, as a way to determine whether the conversion rate of the new version is significantly better than that of the old version in each subset.
+As the marketing people wanted to discover whether the new web page had a higher conversion rate than the old one, we collected a data set which contained users' visits and conversion information of the old and new web pages. From a business perspective, we want the conversion rate to be as high as possible. The goal of the experiment is to compare the advantages of the old and new pages in inducing visitor conversions. Imagine that as an individual web browser, conversions can only be yes or no. Each visitor obeys Bernoulli distribution. After removing repeated visits, the multiple independent Bernoulli distribution can be converted into a binomial distribution problem. In this project, we did a Bayesian AB test. The posterior distributions of old web page and new web page are stored and updated by continuously increasing the number of samples to form a new subset, as a way to determine whether the conversion rate of the new version is significantly better than that of the old version in each subset.
 
 Before we did the Bayesian AB test, we noticed that there was some repetitive data like all the columns details are the same except the "timestamp" and some data error like "new-page" was in the "control" group, "old-page" was in the "treatment" group. So we pre-processed the data to solve these problems.
 ```{r}
@@ -121,30 +129,82 @@ new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
 mimic3d<-read.csv("mimic3d.csv", header = TRUE)
 ```
 
-More specifically, based on the case of conversion rates of old and new pages, we show the derivation process from prior to posterior. From a business perspective, we want the conversion rate to be as high as possible. The goal of the experiment is to compare the advantages of the old and new pages in inducing visitor conversions. Imagine that as an individual web browser, conversions can only be yes or no. Each visitor obeys Bernoulli distribution. After removing repeated visits, the multiple independent Bernoulli distribution can be converted into a binomial distribution problem.  
 Next we want to talk about the choice of prior distribution. In order to compare the old and new pages, we need to model the conversion rates of the old and new pages. Since the conversion rate is in $[0,1]$, we can choose the Beta distribution as the prior.  
-
-Three reasons to choose Beta distribution: 
-
-1. We observed that Beta distribution is located between 0 and 1. We think of the horizontal axis of the curve as the value of the probability of a transition occurring in a trial, and the vertical axis as the probability that that value will occur. This just fits our experimental design.  
-
-2. The Beta distribution can take on various shapes by changing its parameters.  
-
-3. When the likelihood obeys the binomial distribution and the prior obeys the Beta distribution, the posterior distribution is also a Beta distribution, which means that the prior and posterior are conjugate distributions and are easy to calculate. The advantage is that as the appearance of newly added samples, we can quickly derive the posterior distribution. This will be reflected in the third part.  
-
-As mentioned above, when the prior is the Beta distribution and the likelihood is the binomial distribution, the posterior is also the Beta distribution, and has the advantage of convenient and fast calculation. The following fragment will provide a derivation process for this situation, aiming to reveal the relationship between the parameters of the posterior distribution and the parameters of the prior.  
 
 From the above proof process, we conclude that if the prior distribution is $Beta(\alpha,\beta)$, the likelihood obeys the binomial distribution, then the posterior is $Beta(\alpha+s,\beta+n-s)$, where $n$ is the sample size, $s$ is the summation of converted. With this, we can form the model.
 
-By tryinga prior of $Beta(2,20)$ in a Bayesian AB test, we get the distribution of conversion rates of new and old pages respectively, we approach the following conclusion.
-For the choice of the parameters of the prior distribution, we had two cases: one was to use a non-informative prior, i.e., to assume that $Beta(1, 1)$ was the prior distribution of the data of the old and new web pages; the other was to use an informative prior, i.e., to assume that $Beta(2, 20)$ was the prior distribution of the data of the old and new web pages. 
+The figure showed the probability density function of the Beta distribution for five sets of values of the parameters $\alpha$ and $\beta$. From this we can see that different values of $alpha$ and $beta$ can have a great impact on the shape of the Beta distribution, the range of the distribution, and so on. 
+```{r}
+parameters <- data.frame(
+  alpha = c(0.5, 5, 1, 3, 2),
+  beta = c(0.5, 1, 3, 5, 20)
+)
 
-We first took 100 samples to form the first subset and calculated the value (Mean of the proportion of new page's posterior distributions greater than old page's posterior distributions), posterior_old_mean and posterior_new_mean (the mean of the posterior distribution for the old and new web pages), posterior_old_se and posterior_new_se (standard error of the posterior distributions). 
-Then, we took another 100 samples and add them to the first subset to form the second subset and computed the corresponding value, posterior_old_mean, posterior_new_mean, posterior_old_se and posterior_new_se. This was repeated until all the samples had been taken.
+x_values <- seq(0, 1, by = 0.01)
 
-In order to compare the effects of non-infromative priors and informative priors on the posterior results. We ploted the scatter plots of size and value in the non-infomative priors and informative priors conditions respectively. The comparison revealed that in this dataset, the effect of whether the prior was infomative or not on the value value was almost zero. 
+beta_data <- data.frame()
 
-In addition, we could notice that as the sample size of subset increased, the value showed an overall decreasing trend, and finally almost fluctuated around 0.08. This illustrated that the new page was less effective relative to the old page and needed to be improved.
+for (i in 1:nrow(parameters)) {
+  alpha <- parameters$alpha[i]
+  beta <- parameters$beta[i]
+  density <- dbeta(x_values, shape1 = alpha, shape2 = beta)
+  
+  df <- data.frame(x = x_values, density = density, alpha = alpha, beta = beta)
+  beta_data <- rbind(beta_data, df)
+}
+
+library(ggplot2)
+
+ggplot(data = beta_data, aes(x = x, y = density, color = factor(alpha))) +
+  geom_line() +
+  labs(title = "Beta Distributions", x = "X", y = "PDF") +
+  scale_color_discrete(name = "alpha value") +
+  theme_minimal()
+```
+When the sample size was small, if $Beta(\alpha,\beta)$ was chosen as the prior distribution, then the choice of prior became very important, because appropriate and inappropriate parameters could cause a huge impact on the posterior distribution. 
+
+Here was an example. We extracted the first 100 rows of data in the file "ab_data.csv", and selected $Beta(2,20)$ and $Beta(1,1000)$ as the prior distribution of the conversion rate information of the old page, and calculated the corresponding posterior distribution. In the figure, the red one represented the probability density of the posterior distribution when the prior distribution was $Beta(2,20)$; the blue one represented the probability density  of the posterior distribution when the prior distribution was $Beta(1,1000)$. We could see that the probability densities of these two posterior distributions almost did not overlap; the mean conversion rate of the old page calculated with the prior distribution of $Beta(2,20)$ was about 0.017, while the mean conversion rate of the old page calculated with the prior distribution of $Beta(1,1000)$ was about 0.145. So the difference between the two results was still very big. So we had to choose the parameters of the prior distribution carefully.
+```{r}
+old_distinct <- old %>% 
+  distinct(user_id, .keep_all = TRUE) %>% 
+  head(100)
+visitor_to_old <- nrow(old_distinct)
+conversion_old <- sum(old_distinct$converted)
+
+alpha_prior1 <- 2
+beta_prior1 <- 20
+alpha_prior2 <- 1
+beta_prior2 <- 1000
+
+# calculate posterior
+posterior_old1 <- rbeta(1000000, alpha_prior1+conversion_old, beta_prior1+visitor_to_old-conversion_old)
+posterior_old2 <- rbeta(1000000, alpha_prior2+conversion_old, beta_prior2+visitor_to_old-conversion_old)
+
+posterior_Old1 <- data.frame(old_rate=c(posterior_old1))
+posterior_Old2 <- data.frame(old_rate=c(posterior_old2))
+mean_old1 <- mean(posterior_Old1$old_rate)
+mean_old2 <- mean(posterior_Old2$old_rate)
+
+fig_2 <- ggplot() +
+  geom_density(aes(x = posterior_Old1$old_rate), fill = "blue", alpha = 0.5) +
+  geom_density(aes(x = posterior_Old2$old_rate), fill = "red", alpha = 0.5) +
+  geom_vline(xintercept = mean_old1, linetype = "dashed", color = "blue") +
+  geom_vline(xintercept = mean_old2, linetype = "dashed", color = "red") +
+  labs(title = "Probability Density Comparison", subtitle = "Beta(2,20) vs. Beta(1,100)",
+       x = "Conversion rate",
+       y = "Density") +
+  annotate("text", x = 0.03, y = 150, label= "Beta(2,20)") +
+  annotate("text", x = 0.16, y = 25, label= "Beta(1,1000)") +
+  scale_color_manual(values = c("red", "blue"), labels = c("new page", "old page"))
+
+fig_2
+```
+
+We first took 100 samples to form the first subset and calculated the value (Mean of the proportion of new page's posterior distributions greater than old page's posterior distributions), posterior_old_mean and posterior_new_mean (the mean of the posterior distribution for the old and new web pages), posterior_old_se and posterior_new_se (standard error of the posterior distributions). Then, we took another 100 samples and add them to the first subset to form the second subset and computed the corresponding value, posterior_old_mean, posterior_new_mean, posterior_old_se and posterior_new_se. This was repeated until all the samples had been taken.
+
+For the choice of the parameters of the prior distribution, we had two cases: one was to use a non-informative prior, i.e., to assume that $Beta(1, 1)$ was the prior distribution of the data of the old and new web pages; the other was to use an informative prior, i.e., to assume that $Beta(2, 20)$ was the prior distribution of the data of the old and new web pages.
+
+In order to compare the effects of non-infromative priors and informative priors on the posterior results. We ploted the scatter plots of size and value in the non-infomative priors and informative priors conditions respectively. The comparison revealed that in this dataset, the effect of whether the prior was infomative or not on the value value was almost zero.
 ```{r}
 old_distinct <- old %>% distinct(old$user_id, .keep_all = TRUE)
 new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
@@ -156,59 +216,7 @@ conversion_new <- sum(new_distinct$converted)
 alpha_prior <- 2
 beta_prior <- 20
 
-# calculate posterior
-posterior_old <- rbeta(1000000, alpha_prior+conversion_old, beta_prior+visitor_to_old-conversion_old)
-posterior_new <- rbeta(1000000, alpha_prior+conversion_new, beta_prior+visitor_to_new-conversion_new)
-
-# calculate prob of new rate > old rate
-cat("The probability of new page is better than the old page is",mean(posterior_new > posterior_old),"\n")
-
-#Riemann sum as safety check:
-sapply(seq(0.001,0.999, length.out=1000000), function(x){
-  dbeta(x, alpha_prior+conversion_new,beta_prior+visitor_to_new-conversion_new)*
-    pbeta(x, alpha_prior+conversion_old, beta_prior+visitor_to_old-conversion_old)})%>%sum()/1000000
-
-```
-
-At the same time, we calculate the expected values of the conversion rates of the old and new pages respectively as follows.
-```{r}
-posterior_Old <- data.frame(old_rate=c(posterior_old))
-posterior_New <- data.frame(new_rate=c(posterior_new))
-mean_old <- mean(posterior_Old$old_rate)
-mean_new <- mean(posterior_New$new_rate)
-cat("Mean of conversion rate on old page is", mean_old, "\n")
-cat("Mean of conversion rate on new page is", mean_new, "\n")
-```
-
-In order to compare the conversion rates of the old and new pages more intuitively, we draw the obtained conversion rate distribution of the old and new pages in an individual graph.
-
-```{r}
-# plot density 
-fig_2 <- ggplot() +
-  geom_density(aes(x = posterior_Old$old_rate), fill = "blue", alpha = 0.5) +
-  geom_density(aes(x = posterior_New$new_rate), fill = "red", alpha = 0.5) +
-  geom_vline(xintercept = mean_old, linetype = "dashed", color = "blue") +
-  geom_vline(xintercept = mean_new, linetype = "dashed", color = "red") +
-  labs(title = "Probability Density Comparison", subtitle = "New page vs. old page",
-       x = "Conversion rate",
-       y = "Density") +
-  annotate("text", x = 0.1187, y = 300, label= "New Page") +
-  annotate("text", x = 0.1205, y = 300, label= "Old Page") +
-  annotate("text", x = mean_old, y = 0, label = paste("mean of old\n", round(mean_old, 6)), vjust = 0.5, size = 3) +
-  annotate("text", x = mean_new, y = 0, label = paste("mean of new\n", round(mean_new, 6)), vjust = 0.5, size = 3) +
-  annotate("segment", x = mean_old, xend = mean_new, y = 510, yend = 510, colour = "black", linewidth = 1, arrow = arrow()) +
-  annotate("text", x = (mean_old + mean_new)/2, y = 480, label = paste(round(mean_old-mean_new,6))) +
-  scale_color_manual(values = c("red", "blue"), labels = c("new page", "old page"))
-
-fig_2
-```
-
-The figure also shows the density function of the conversion rate of the new and old pages. We can see that compared to the old page, the probability density of the new page is shifted to the left. This implies that from an overall level, the performance of the new page is likely to be inferior to that of the old page. Furthermore, the expected conversion rate for the new page is `r mean_new`. However, the expected conversion rate for the old page is `r mean_old`. The conversion rate expectation for the new page is `r round(mean_old-mean_new,6)` lower than the conversion rate expectation for the old page.  
-
-In terms of conversion rate performance, since the probability that the new page is better than the old page is only about `r mean(posterior_new > posterior_old)`. At the same time, the graphed information shows that the conversion rate expectation of the new page is actually lower than that of the old page. There is no significant evidence that changing to a new page will increase visitor conversion rates.
-
-```{r}
-#using non-informative priors
+#using non-informative priors, subset size = 100
 my_instance <- BayesianSample$new(old_distinct,new_distinct,rows_per_subset = 1000,
                                   alpha_prior_old=1,
                                   alpha_prior_new=1,
@@ -253,11 +261,75 @@ ggplot(result_long1, aes(x = size, y = Mean, color = Variable)) +
   scale_color_manual(values = c("posterior_old_mean" = "blue", "posterior_new_mean" = "red"))
 ```
 
-Finally, we ploted the 95% confidence intervals for each subset of posterior_new_mean and posterior_old_mean. As the sample size of the subset increased, the range of the confidence intervals (the range of the light blue area on the graph) becomed gradually narrower, indicating that: the larger the sample size of the subset, the smaller the error caused by sampling, the closer the posterior_new_mean and posterior_old_mean were to the true value, and the results were more reliable.
+We plotted the 95% confidence intervals for each subset of posterior_new_mean and posterior_old_mean. As the sample size of the subset increased, the range of the confidence intervals (the range of the light blue area on the graph) became gradually narrower, indicating that: the larger the sample size of the subset, the smaller the error caused by sampling, the closer the posterior_new_mean and posterior_old_mean were to the true value, and the results were more reliable.
 ```{r}
 # Plot Credible Interval
 my_instance$PlotCI()%>%print()
 ```
+
+By trying a prior of $Beta(2,20)$ in a Bayesian AB test, we get the distribution of conversion rates of new and old pages respectively, we approach the following conclusion.
+
+```{r}
+old_distinct <- old %>% distinct(old$user_id, .keep_all = TRUE)
+new_distinct <- new %>% distinct(new$user_id, .keep_all = TRUE)
+visitor_to_old <- nrow(old_distinct)
+visitor_to_new <- nrow(new_distinct)
+conversion_old <- sum(old_distinct$converted)
+conversion_new <- sum(new_distinct$converted)
+
+alpha_prior <- 2
+beta_prior <- 20
+
+# calculate posterior
+posterior_old <- rbeta(1000000, alpha_prior+conversion_old, beta_prior+visitor_to_old-conversion_old)
+posterior_new <- rbeta(1000000, alpha_prior+conversion_new, beta_prior+visitor_to_new-conversion_new)
+
+# calculate prob of new rate > old rate
+cat("The probability of new page is better than the old page is",mean(posterior_new > posterior_old),"\n")
+
+#Riemann sum as safety check:
+sapply(seq(0.001,0.999, length.out=1000000), function(x){
+    dbeta(x, alpha_prior+conversion_new,beta_prior+visitor_to_new-conversion_new)*
+      pbeta(x, alpha_prior+conversion_old, beta_prior+visitor_to_old-conversion_old)})%>%sum()/1000000
+
+```
+
+At the same time, we calculate the expected values of the conversion rates of the old and new pages respectively as follows.
+```{r}
+posterior_Old <- data.frame(old_rate=c(posterior_old))
+posterior_New <- data.frame(new_rate=c(posterior_new))
+mean_old <- mean(posterior_Old$old_rate)
+mean_new <- mean(posterior_New$new_rate)
+cat("Mean of conversion rate on old page is", mean_old, "\n")
+cat("Mean of conversion rate on new page is", mean_new, "\n")
+```
+
+In order to compare the conversion rates of the old and new pages more intuitively, we draw the obtained conversion rate distribution of the old and new pages in an individual graph.
+
+```{r}
+# plot density 
+fig_2 <- ggplot() +
+  geom_density(aes(x = posterior_Old$old_rate), fill = "blue", alpha = 0.5) +
+  geom_density(aes(x = posterior_New$new_rate), fill = "red", alpha = 0.5) +
+  geom_vline(xintercept = mean_old, linetype = "dashed", color = "blue") +
+  geom_vline(xintercept = mean_new, linetype = "dashed", color = "red") +
+  labs(title = "Probability Density Comparison", subtitle = "New page vs. old page",
+       x = "Conversion rate",
+       y = "Density") +
+  annotate("text", x = 0.1187, y = 300, label= "New Page") +
+  annotate("text", x = 0.1205, y = 300, label= "Old Page") +
+  annotate("text", x = mean_old, y = 0, label = paste("mean of old\n", round(mean_old, 6)), vjust = 0.5, size = 3) +
+  annotate("text", x = mean_new, y = 0, label = paste("mean of new\n", round(mean_new, 6)), vjust = 0.5, size = 3) +
+  annotate("segment", x = mean_old, xend = mean_new, y = 510, yend = 510, colour = "black", linewidth = 1, arrow = arrow()) +
+  annotate("text", x = (mean_old + mean_new)/2, y = 480, label = paste(round(mean_old-mean_new,6))) +
+  scale_color_manual(values = c("red", "blue"), labels = c("new page", "old page"))
+
+fig_2
+```
+
+The figure also shows the density function of the conversion rate of the new and old pages. We can see that compared to the old page, the probability density of the new page is shifted to the left. This implies that from an overall level, the performance of the new page is likely to be inferior to that of the old page. Furthermore, the expected conversion rate for the new page is `r mean_new`. However, the expected conversion rate for the old page is `r mean_old`. The conversion rate expectation for the new page is `r round(mean_old-mean_new,6)` lower than the conversion rate expectation for the old page.  
+
+In terms of conversion rate performance, since the probability that the new page is better than the old page is only about `r mean(posterior_new > posterior_old)`. At the same time, the graphed information shows that the conversion rate expectation of the new page is actually lower than that of the old page. There is no significant evidence that changing to a new page will increase visitor conversion rates.
 
 # Bayesian Regression Analysis
 
@@ -363,7 +435,27 @@ CategoryTest <- CategoryDependence$new(cate_data,
                                        response_y="LOSdays_Less2")
 CategoryTest$p_value
 ```
+From the chisquare test results above, we can see that feature “gender” has a pvalue greater than 0.05, so we can reject the dependence of gender and our target variable(LOSdays < 2 days)
 
+Consider the rest features, to determine the trade-off of categorical variables, we use randomForest in R. This function implements Breiman’s random forest algorithm. We hope to calculate feature importance with the help of Breiman’s random forest algorithm.  
+Here is a brief introduction to the principle of this algorithm. First we divide the data into predictor (feature) and target (response). In this way we get the data set $Dateset = {\{(X_i,Y_i)\}_{i=1}^{n}}$, where $X_i$ is the $i^{th}$ predictor, $Y_i$ is the $i^{th}$ target. Next, we do Bootstrap Sampling on the dataset (a kind of sampling with replacement, in this sampling method, about 36% of the samples will never be sampled, ) to form multiple subsets, and then construct individual decision tree for each of them. Based on our sampling method, about 36% of the samples will never appear in any subset of the decision tree. Such samples are called out-of-bag data. After all trees are constructed, the average error on the out-of-bag data is calculated to obtain the out-of-bag error of the model.
+For every $i^{th}$feature, we destroy its correlation by random permutations and then recalculate the model's out-of-bag error. The feature importance can be calculated by comparing the out-of-bag error of the original model and the model after destroying the feature (via calculating and compare the average error before and after the disruption). A larger error increase indicates that the feature contributes more to the model's performance and this feature would be considered as a more important feature. Although this method has defect when dealing with features of different sizes (random forest prefers features with large sizes), in our case, there is no such drawback because the features have the same size.
+
+```{r}
+library(randomForest)
+cate_data_WithoutGender <- cate_data %>% select(-gender)
+target <- cate_data_WithoutGender$LOSdays_Less2
+features <- cate_data_WithoutGender[, -1]
+
+model <- randomForest(x = features, y = target, ntree = 100)
+
+feature_importance <- importance(model)
+
+print(feature_importance)
+```
+From the above result, we see the feature importance of ExpiredHospital is much greater than other two. ExpiredHospital contributes more to the target. However, ExpiredHospital indicates whether the patient died within the given hospitalization. 1 indicates death in the hospital, and 0 indicates survival to hospital discharge. (https://mimic.mit.edu/docs/iii/tables/admissions/). THis feature should be logged after the process ends. Logically, in-hospital death should not be used as a feature to predict a patient's length of stay. 
+
+```{r}
 ```{r,eval=FALSE}
 mimic3d_clean<-mimic3d%>%select(-c("hadm_id","gender","admit_type","admit_location","AdmitDiagnosis",
                                    "insurance","religion","marital_status","ethnicity",
@@ -415,6 +507,5 @@ shots<-webshot(url = "./Figures/PredictP.html", file = "./Figures/PredictP.png",
 ```{r, echo=FALSE, fig.align='center', fig.cap = "Prediction Plot"}
 knitr::include_graphics("./Figures/PredictP.png")
 ```
-
 
 # References
