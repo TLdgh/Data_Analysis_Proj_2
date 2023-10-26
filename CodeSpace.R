@@ -130,7 +130,7 @@ CategoryDependence <- setRefClass(
 BayesianRegression<-setRefClass(
   "RegressionClass",
   fields = list(train_data="data.frame", responseV="character", predictorV="character", 
-                prior_sigma="numeric", prior_beta="list", posteriorSample="data.frame"),
+                prior_sigma="numeric", prior_beta="list", posteriorSample="data.frame", responseV_star="numeric"),
   methods = list(
     initialize=function(train_data, responseV, predictorV, prior_sigma, prior_beta){
       .self$responseV<-responseV
@@ -193,7 +193,8 @@ BayesianRegression<-setRefClass(
         geom_vline(data=df_vline, aes(xintercept = params_est), linetype = 'dashed', linewidth = 1)+
         geom_text(data=df_vline, aes(x= params_est, label = paste("Param_Est:", round(params_est,4)), y=Inf),size = 2,hjust=0, vjust=2) + 
         facet_wrap(~labels, scales = 'free',labeller = label_parsed) + theme_bw() +
-        labs(x = 'Parameters', y = 'Density',title = 'Posterior Density')
+        labs(x = 'Parameters', y = 'Density',title = 'Posterior Density')+
+        theme(axis.text.x = element_text(vjust = 0.9,angle = 45))
       
       return(p)
     },
@@ -209,10 +210,11 @@ BayesianRegression<-setRefClass(
       betas<-betas%>%arrange(match(param, colnames(x)))%>%filter(param!="sigmasq")%>%column_to_rownames(var = "param") %>% data.matrix()
       
       y_star<-x%*%betas
+      .self$responseV_star<-as.numeric(y_star)
       
       p<-data.frame(y=as.numeric(y), y_star=as.numeric(y_star))%>%gather(key="data", value = "value")%>%
         mutate(value=ifelse(value>=0, value, 0))%>%
-        mutate(value=ifelse(value<=50, value, 50))%>%
+        mutate(value=ifelse(value<=30, value, 30))%>%
         plot_ly(x = ~value, color=~data, type = "histogram",nbinsx=200)%>% 
         layout(
           title = "Histogram Plot",
