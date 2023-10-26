@@ -32,7 +32,6 @@ library(randomForest)
 
 ```{r, include=FALSE}
 source("CodeSpace.R")
-#source("TestSpace.R")
 ```
 
 ### Introduction
@@ -470,4 +469,12 @@ From the predicted result in Figure 9 above, we saw that the distribution of the
 Based on our result, we believed that patients most likely had to miss work for more than 2 days. 
 
 ### References
+
+<div id="refs"></div>
+
+### Appendix
+```{r, echo=TRUE, include=TRUE}
+# Test function validity
+source("TestSpace.R")
+```
 
