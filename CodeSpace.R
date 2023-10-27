@@ -193,7 +193,7 @@ BayesianRegression<-setRefClass(
         geom_vline(data=df_vline, aes(xintercept = params_est), linetype = 'dashed', linewidth = 1)+
         geom_text(data=df_vline, aes(x= params_est, label = paste("Param_Est:", round(params_est,4)), y=Inf),size = 2,hjust=0, vjust=2) + 
         facet_wrap(~labels, scales = 'free',labeller = label_parsed) + theme_bw() +
-        labs(x = 'Parameters', y = 'Density',title = 'Posterior Density')+
+        labs(x = 'Parameters', y = 'Density')+
         theme(axis.text.x = element_text(vjust = 0.9,angle = 45))
       
       return(p)
@@ -212,14 +212,14 @@ BayesianRegression<-setRefClass(
       y_star<-x%*%betas
       .self$responseV_star<-as.numeric(y_star)
       
-      p<-data.frame(y=as.numeric(y), y_star=as.numeric(y_star))%>%gather(key="data", value = "value")%>%
+      p<-data.frame(True_Value=as.numeric(y), Predicted_Value=as.numeric(y_star))%>%gather(key="data", value = "value")%>%
         mutate(value=ifelse(value>=0, value, 0))%>%
         mutate(value=ifelse(value<=30, value, 30))%>%
-        plot_ly(x = ~value, color=~data, type = "histogram",nbinsx=200)%>% 
-        layout(
-          title = "Histogram Plot",
-          xaxis = list(title = "X-Axis Label"),
-          yaxis = list(title = "Frequency"),
+        plot_ly(x = ~value, color=~data, type = "histogram",nbinsx=200, width = 700, height = 200)%>% 
+        layout(margin=list(l=0, r=0, b=0, t=0),
+          xaxis = list(title = "Length of Stay in Care Unit",titlefont=list(size=8),tickfont=list(size=8)),
+          yaxis = list(title = "Frequency", titlefont=list(size=8),tickfont=list(size=8)),
+          legend=list(font=list(size=8)),
           bargap = 0.5
         )
       return(p)
